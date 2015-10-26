@@ -1,0 +1,11 @@
+<CVar Name="iMaxCreatePlace">2</CVar>
+<CVar Name="iMaxCreateSelfloop">2</CVar>
+<CVar Name="iMaxCreateTransition">2</CVar>
+<CVar Name="pCreatePlace">10</CVar>
+<CVar Name="pCreateSelfloop">10</CVar>
+<CVar Name="pCreateTransition">10</CVar>
+<CVar Name="pInsertTransition">10</CVar>
+<CVar Name="pInsertPalce">10</CVar>
+<CVar Name="pInsertConvergentPlaceTransition">0</CVar>
+
+
