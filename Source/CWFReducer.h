@@ -30,28 +30,27 @@ public:
 private:
     CPetriNet * m_cGraph;
 
-    void CleanUp();
+    void DisplayProgress();
 
     void TryRemoveAllPlaces();
-    bool CanRemovePlace(CGraph<int> * cPlace);
+    bool CanRemovePlace(tNode * cPlace);
 
     void TryRemoveAllTransitions();
-    bool CanRemoveReverseTransition(CGraph<int> * cTransition);
-    bool CanRemoveTransition(CGraph<int> * cTransition);
-    bool TransitionEquivalentToSetOfTransitions(CGraph<int> * cT, std::set<CGraph<int> *, CGraph_compare<int>> * sSet, bool bReverse);
-    std::set<std::set<CGraph<int> *, CGraph_compare<int>> *> * GetSubSets(std::set<CGraph<int> *, CGraph_compare<int>> * sSet);
+    bool CanRemoveTransition(tNode * cTransition);
+    bool TransitionEquivalentToSetOfTransitions(tNode * cT, tNodeSet * sSet);
+    std::set<tNodeSet *> * GetSubSets(tNodeSet * sSet);
 
     void TryRemoveAllInsertedPlaces();
-    bool CanRemoveInsertedPlace(CGraph<int> * cPlace);
+    bool CanRemoveInsertedPlace(tNode * cPlace);
 
     void TryRemoveAllInsertedTransitions();
-    bool CanRemoveInsertedTransition(CGraph<int> * cTransition);
+    bool CanRemoveInsertedTransition(tNode * cTransition);
 
     void TryRemoveAllSelfloopTransitions();
-    bool CanRemoveSelfloopTransition(CGraph<int> * cTransition);
+    bool CanRemoveSelfloopTransition(tNode * cTransition);
 
     void TryRemoveAllConvergentPlaces();
-    bool CanRemoveConvergentPlace(CGraph<int> * cPlace);
+    bool CanRemoveConvergentPlace(tNode * cPlace);
 
     int m_iTransitionLabel;
     int GetNextTransitionLabel()
@@ -69,6 +68,13 @@ private:
         return m_iArcLabel++;
     }
 
+    int m_iCounter;
+    int GetNextCounter()
+    {
+        return m_iCounter++;
+    }
+
+    int m_InitialSize;
     int m_ReductionDuration;
 };
 

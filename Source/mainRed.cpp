@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
 {
     try
     {
-        std::string Version = "Alpha 0.1";
+        std::string Version = "Alpha 0.1.2";
         PrintLogo(Version);
 
         if(argc != 2)
@@ -65,12 +65,10 @@ int main(int argc, char* argv[])
 
         std::cout <<  std::endl;
 
-       /* std::ofstream outfile;
+        /*std::ofstream outfile;
         outfile.open("results.txt", std::ios::app);
-        outfile << initialSize << " " << cWFReducer->GetReductionDuration() << " " << cWFReducer->GetReducedWF()->GetNodes()->size() << std::endl;
-*/
+        outfile << initialSize << " " << cWFReducer->GetReductionDuration() << " " << cWFReducer->GetReducedWF()->GetNodes()->size() << std::endl;*/
 
-        //
 
         cWFReducer->Terminate();
     }
