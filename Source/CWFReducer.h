@@ -26,6 +26,34 @@ public:
     {
         return this->m_ReductionDuration;
     }
+    int GetRemovedPlaces()
+    {
+        return this->m_iRemovedPlaces;
+    }
+    int GetRemovedTransitions()
+    {
+        return this->m_iRemovedTransitions;
+    }
+    int GetRemovedInsertedPlaces()
+    {
+        return this->m_iRemovedInsertedPlaces;
+    }
+    int GetRemovedInsertedTransitions()
+    {
+        return this->m_iRemovedInsertedTransitions;
+    }
+    int GetRemovedSelfloopTransitions()
+    {
+        return this->m_iRemovedSelfloopTransitions;
+    }
+    int GetRemovedConvergentPlaces()
+    {
+        return this->m_iRemovedConvergentPlaces;
+    }
+    int GetRemovedDivergentPlaces()
+    {
+        return this->m_iRemovedDivergentPlaces;
+    }
 
 private:
     CPetriNet * m_cGraph;
@@ -34,23 +62,36 @@ private:
 
     void TryRemoveAllPlaces();
     bool CanRemovePlace(tNode * cPlace);
+    bool PlaceEquivalentToSetOfPlaces(tNode * cP, tNodeSet * sSet);
+    int m_iRemovedPlaces;
 
     void TryRemoveAllTransitions();
     bool CanRemoveTransition(tNode * cTransition);
     bool TransitionEquivalentToSetOfTransitions(tNode * cT, tNodeSet * sSet);
-    std::set<tNodeSet *> * GetSubSets(tNodeSet * sSet);
+    int m_iRemovedTransitions;
 
     void TryRemoveAllInsertedPlaces();
     bool CanRemoveInsertedPlace(tNode * cPlace);
+    int m_iRemovedInsertedPlaces;
 
     void TryRemoveAllInsertedTransitions();
     bool CanRemoveInsertedTransition(tNode * cTransition);
+    int m_iRemovedInsertedTransitions;
 
     void TryRemoveAllSelfloopTransitions();
     bool CanRemoveSelfloopTransition(tNode * cTransition);
+    int m_iRemovedSelfloopTransitions;
 
     void TryRemoveAllConvergentPlaces();
     bool CanRemoveConvergentPlace(tNode * cPlace);
+    int m_iRemovedConvergentPlaces;
+
+    void TryRemoveAllDivergentPlaces();
+    bool CanRemoveDivergentPlace(tNode * cPlace);
+    int m_iRemovedDivergentPlaces;
+
+    bool HaveProducerOrConsumer(tNodeSet * cPlaces, tNode * cTransition);
+    std::set<tNodeSet *> * GetSubSets(tNodeSet * sSet);
 
     int m_iTransitionLabel;
     int GetNextTransitionLabel()

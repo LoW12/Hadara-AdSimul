@@ -48,13 +48,25 @@ int main(int argc, char* argv[])
 
         cWFReducer->ReduceWF();
 
-        std::cout << "Workflow reduced" << "(new size : " << cWFReducer->GetReducedWF()->GetNodes()->size() << ")" << std::endl;
-        std::cout << "Reduced Workflow t(ms) : " << cWFReducer->GetReductionDuration() << std::endl;
+        std::cout << std::endl;
+
+        std::cout << "*RemovedPlaces: " << cWFReducer->GetRemovedPlaces() << std::endl;
+        std::cout << "*RemovedTransitions: " << cWFReducer->GetRemovedTransitions() << std::endl;
+        std::cout << "*RemovedInsertedPlaces: " << cWFReducer->GetRemovedInsertedPlaces() << std::endl;
+        std::cout << "*RemovedInsertedTransitions: " << cWFReducer->GetRemovedInsertedTransitions() << std::endl;
+        std::cout << "*RemovedSelfloopTransitions: " << cWFReducer->GetRemovedSelfloopTransitions() << std::endl;
+        std::cout << "*RemovedConvergentPlaces: " << cWFReducer->GetRemovedConvergentPlaces() << std::endl;
+        std::cout << "*RemovedDivergentPlaces: " << cWFReducer->GetRemovedDivergentPlaces() << std::endl;
+
+        std::cout << std::endl;
+
+        std::cout << "**Reduced workflow size: " << cWFReducer->GetReducedWF()->GetNodes()->size() << ")" << std::endl;
+        std::cout << "**ReductionDuration t(ms): " << cWFReducer->GetReductionDuration() << std::endl;
 
         std::cout <<  std::endl;
         if(cWFReducer->GetReducedWF()->GetNodes()->size() == 1)
         {
-            std::cout <<  cGraph->GetLabel() << " is a generalised sound workflow ! **** GOOD ***" << std::endl;
+            std::cout <<  cGraph->GetLabel() << " is a generalised sound workflow ! **** SUCCESS ***" << std::endl;
         }
         else
         {
@@ -65,9 +77,9 @@ int main(int argc, char* argv[])
 
         std::cout <<  std::endl;
 
-        /*std::ofstream outfile;
+        std::ofstream outfile;
         outfile.open("results.txt", std::ios::app);
-        outfile << initialSize << " " << cWFReducer->GetReductionDuration() << " " << cWFReducer->GetReducedWF()->GetNodes()->size() << std::endl;*/
+        outfile << sWFPath << " " << initialSize << " " << cWFReducer->GetReductionDuration() << " " << cWFReducer->GetReducedWF()->GetNodes()->size() << std::endl;
 
 
         cWFReducer->Terminate();

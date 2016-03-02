@@ -3,6 +3,10 @@
 
 #include "CGraph.h"
 
+typedef CGraph<int>  tNode;
+typedef std::set<CGraph<int> *, CGraph_compare<int>>  tNodeSet;
+typedef std::set<CGraph<int> *, CGraph_compare<int>>::iterator tNodeSetIt;
+
 class CPetriNet : public CGraph<int>
 {
 public:
@@ -11,7 +15,7 @@ public:
         this->m_Transitions = new std::set<CGraph<int> *, CGraph_compare<int>>();
         this->m_Places = new std::set<CGraph<int> *, CGraph_compare<int>>();
     }
-    void AddNode(CGraph<int> * Node)
+    void AddNode(tNode * Node)
     {
         if(Node->GetType() == "Transition")
         {
@@ -37,15 +41,11 @@ public:
         }
         CGraph<int>::AddNode(Node);
     }
-    std::set<CGraph<int> *, CGraph_compare<int>>::iterator DeleteNode(CGraph<int> *Node)
+    tNodeSetIt DeleteNode(CGraph<int> *Node)
     {
-        std::set<CGraph<int> *, CGraph_compare<int>>::iterator NodeIt;
+        tNodeSetIt NodeIt;
         if(Node->GetType() == "Transition")
         {
-            /*if(Node->GetLabel() == "t_256")
-            {
-                throw new LDException("CPetriNet : DeleteNode, error(" + Node->GetLabel() + ")");
-            }*/
             NodeIt = this->m_Transitions->find(Node);
             if (NodeIt != this->m_Transitions->end())
             {
@@ -57,11 +57,7 @@ public:
             }
         }
         else  if(Node->GetType() == "Place")
-        {
-            /*if(Node->GetLabel() == "i" || Node->GetLabel() == "o")
-            {
-                throw new LDException("CPetriNet : DeleteNode, error(" + Node->GetLabel() + ")");
-            }*/
+        {            
             NodeIt = this->m_Places->find(Node);
             if (NodeIt != this->m_Places->end())
             {
@@ -76,11 +72,11 @@ public:
         CGraph<int>::DeleteNode(Node);
         return NodeIt;
     }
-    std::set<CGraph<int> *, CGraph_compare<int>> * GetTransitions()
+    tNodeSet * GetTransitions()
     {
         return this->m_Transitions;
     }
-    std::set<CGraph<int> *, CGraph_compare<int>> * GetPlaces()
+    tNodeSet * GetPlaces()
     {
         return this->m_Places;
     }
@@ -91,7 +87,7 @@ public:
         out += "subgraph place\n {\n";
         out += "graph [shape=circle,color=gray];\n";
         out += "node [shape=circle];\n";
-        for (NodeItType NodeIt = this->m_Places->begin(); NodeIt != this->m_Places->end(); ++NodeIt)
+        for (tNodeSetIt NodeIt = this->m_Places->begin(); NodeIt != this->m_Places->end(); ++NodeIt)
         {
             out += (*NodeIt)->GetLabel()+";\n";
         }
@@ -99,7 +95,7 @@ public:
 
         out += "subgraph transitions\n {\n";
         out += "node [shape=rect,height=0.2];\n";
-        for (NodeItType NodeIt = this->m_Transitions->begin(); NodeIt != this->m_Transitions->end(); ++NodeIt)
+        for (tNodeSetIt NodeIt = this->m_Transitions->begin(); NodeIt != this->m_Transitions->end(); ++NodeIt)
         {
             out += (*NodeIt)->GetLabel()+";\n";
         }
@@ -125,8 +121,8 @@ public:
     }
 
 protected:
-    std::set<CGraph<int> *, CGraph_compare<int>> * m_Transitions;
-    std::set<CGraph<int> *, CGraph_compare<int>> * m_Places;
+    tNodeSet * m_Transitions;
+    tNodeSet * m_Places;
 
 };
 
