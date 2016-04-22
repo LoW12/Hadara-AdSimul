@@ -22,6 +22,28 @@ void PrintLogo(std::string Version)
 
     std::cout << std::endl << " *** Hadara - AdSimul - Red *** " <<  Version << std::endl << std::endl;
 }
+bool isAtomic(CPetriNet * cPetriNet)
+{
+    if(cPetriNet->GetNodes()->size() != 3)
+    {
+        return false;
+    }
+
+    tNode * firstNode = *(cPetriNet->GetTransitions()->begin());
+    tNodeSet * inFirstNode = firstNode->GetInNeighbors();
+    tNodeSet * outFirstNode = firstNode->GetOutNeighbors();
+
+    if(inFirstNode->size() == 1 && outFirstNode->size()  == 1)
+    {
+        tNode * i = *(inFirstNode->begin());
+        tNode * o = *(outFirstNode->begin());
+        if(i->GetInNeighbors()->size() == 0 && o->GetOutNeighbors()->size() == 0)
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 int main(int argc, char* argv[])
 {
@@ -52,8 +74,6 @@ int main(int argc, char* argv[])
 
         std::cout << "*RemovedPlaces: " << cWFReducer->GetRemovedPlaces() << std::endl;
         std::cout << "*RemovedTransitions: " << cWFReducer->GetRemovedTransitions() << std::endl;
-        std::cout << "*RemovedInsertedPlaces: " << cWFReducer->GetRemovedInsertedPlaces() << std::endl;
-        std::cout << "*RemovedInsertedTransitions: " << cWFReducer->GetRemovedInsertedTransitions() << std::endl;
         std::cout << "*RemovedSelfloopTransitions: " << cWFReducer->GetRemovedSelfloopTransitions() << std::endl;
         std::cout << "*RemovedConvergentPlaces: " << cWFReducer->GetRemovedConvergentPlaces() << std::endl;
         std::cout << "*RemovedDivergentPlaces: " << cWFReducer->GetRemovedDivergentPlaces() << std::endl;
@@ -64,7 +84,8 @@ int main(int argc, char* argv[])
         std::cout << "**ReductionDuration t(ms): " << cWFReducer->GetReductionDuration() << std::endl;
 
         std::cout <<  std::endl;
-        if(cWFReducer->GetReducedWF()->GetNodes()->size() == 1)
+
+        if(isAtomic(cWFReducer->GetReducedWF()))
         {
             std::cout <<  cGraph->GetLabel() << " is a generalised sound workflow ! **** SUCCESS ***" << std::endl;
         }
@@ -77,10 +98,10 @@ int main(int argc, char* argv[])
 
         std::cout <<  std::endl;
 
-        std::ofstream outfile;
+        /*std::ofstream outfile;
         outfile.open("results.txt", std::ios::app);
         outfile << sWFPath << " " << initialSize << " " << cWFReducer->GetReductionDuration() << " " << cWFReducer->GetReducedWF()->GetNodes()->size() << std::endl;
-
+        */
 
         cWFReducer->Terminate();
     }

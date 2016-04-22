@@ -37,21 +37,17 @@ void CWFReducer::ReduceWF()
 
         //std::cout << "TryRemoveAllPlaces" << std::endl;
         this->TryRemoveAllPlaces();
-        //std::cout << "TryRemoveAllInsertedTransitions" << std::endl;
-        this->TryRemoveAllInsertedTransitions();
-        //std::cout << "TryRemoveAllInsertedPlaces" << std::endl;
-        this->TryRemoveAllInsertedPlaces();
         //std::cout << "TryRemoveAllSelfloopTransitions" << std::endl;
         this->TryRemoveAllSelfloopTransitions();
         //std::cout << "TryRemoveAllTransitions" << std::endl;
         this->TryRemoveAllTransitions();
-
         //std::cout << "TryRemoveAllConvergentPlaces" << std::endl;
         this->TryRemoveAllConvergentPlaces();
         //std::cout << "TryRemoveAllDivergentPlaces" << std::endl;
         this->TryRemoveAllDivergentPlaces();
 
-     
+        //bReduced = false;
+
         if(iSize == this->m_cGraph->GetNodes()->size())
         {
             bReduced = false;
@@ -69,7 +65,7 @@ void CWFReducer::DisplayProgress()
 {
     static float fDisplayedProgress = 0;
     int barWidth = 70;
-    float fCurrentProgress = 1- ((float)(this->m_cGraph->GetNodes()->size()-1)/(float)(this->m_InitialSize));
+    float fCurrentProgress = 1- ((float)(this->m_cGraph->GetNodes()->size()-3)/(float)(this->m_InitialSize));
     if((fCurrentProgress - fDisplayedProgress > 0.01) || (fCurrentProgress == 1))
     {
         fDisplayedProgress = fCurrentProgress;
@@ -534,170 +530,6 @@ std::set<tNodeSet *> * CWFReducer::GetSubSets(tNodeSet * sSet)
     }
 }
 
-void CWFReducer::TryRemoveAllInsertedPlaces()
-{
-    bool bReduced = true;
-    do
-    {
-        bReduced = false;
-        tNodeSetIt NodeIt = this->m_cGraph->GetPlaces()->begin();
-        while( NodeIt != this->m_cGraph->GetPlaces()->end())
-        {
-            if(this->CanRemoveInsertedPlace((*NodeIt)))
-            {
-                //std::cout << "Removing inserted place: " << (*NodeIt)->GetLabel() << std::endl;
-                tNode * inT =  *((*NodeIt)->GetInNeighbors()->begin());
-                tNode * ouT =  *((*NodeIt)->GetOutNeighbors()->begin());
-                tNodeSet * outPlaces =  ouT->GetOutNeighbors();
-                for (tNodeSetIt NodeOuIt = outPlaces->begin(); NodeOuIt != outPlaces->end(); ++NodeOuIt)
-                {
-                    CArc<int> *outA = new CArc<int>("Arc", "na_" + std::to_string(this->GetNextArcLabel()), inT, (*NodeOuIt), 1);
-                    this->m_cGraph->AddArc(outA);
-                }
-                this->m_cGraph->DeleteNode(ouT);
-                NodeIt = this->m_cGraph->DeleteNode((*NodeIt));
-                //this->m_cGraph->SaveAsDot("dot/steps/step"+std::to_string(this->GetNextCounter())+".dot");
-                this->DisplayProgress();
-                this->m_iRemovedInsertedPlaces++;
-                bReduced = true;              
-            }
-            else
-            {
-                ++NodeIt;
-            }
-        }
-    }
-    while (bReduced);
-}
-
-bool CWFReducer::CanRemoveInsertedPlace(tNode * cPlace)
-{
-    if(cPlace->GetLabel() == "i" || cPlace->GetLabel() == "o")
-    {
-        return false;
-    }
-
-    tNodeSet * inTransitions =  cPlace->GetInNeighbors();
-    tNodeSet * outTransitions =  cPlace->GetOutNeighbors();
-    if(inTransitions->size() != 1 || outTransitions->size() != 1)
-    {
-        return false;
-    }
-
-    tNode * outT = (*outTransitions->begin());
-    tNodeSet * outTinP =  outT->GetInNeighbors();
-    tNodeSet * outToutP =  outT->GetOutNeighbors();
-
-    if(outTinP->size() != 1)
-    {
-        return false;
-    }
-
-    tNode * inT = (*inTransitions->begin());
-    tNodeSet * inToutP =  inT->GetOutNeighbors();
-
-    for (tNodeSetIt NodeOuIt = inToutP->begin(); NodeOuIt != inToutP->end(); ++NodeOuIt)
-    {
-        if(outToutP->find(*NodeOuIt) != outToutP->end())
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-void CWFReducer::TryRemoveAllInsertedTransitions()
-{
-    bool bReduced = true;
-    do
-    {
-        bReduced = false;
-        tNodeSetIt NodeIt = this->m_cGraph->GetTransitions()->begin();
-        while( NodeIt != this->m_cGraph->GetTransitions()->end())
-        {
-            if(this->CanRemoveInsertedTransition((*NodeIt)))
-            {
-                //std::cout << "Removing inserted transition: " << (*NodeIt)->GetLabel() << std::endl;
-                tNode * inP =  *((*NodeIt)->GetInNeighbors()->begin());
-                tNode * ouP = *((*NodeIt)->GetOutNeighbors()->begin());
-                tNodeSet *inTransitions = inP->GetInNeighbors();
-                for (tNodeSetIt NodeInIt = inTransitions->begin(); NodeInIt != inTransitions->end(); ++NodeInIt)
-                {
-                    CArc<int> *inA = new CArc<int>("Arc", "na_" + std::to_string(this->GetNextArcLabel()), (*NodeInIt), ouP, 1);
-                    this->m_cGraph->AddArc(inA);
-                }
-                tNodeSet * outTransitions =  inP->GetOutNeighbors();
-                for (tNodeSetIt NodeOutIt = outTransitions->begin(); NodeOutIt != outTransitions->end(); ++NodeOutIt)
-                {
-                    CArc<int> *inA = new CArc<int>("Arc", "na_" + std::to_string(this->GetNextArcLabel()), ouP, (*NodeOutIt), 1);
-                    this->m_cGraph->AddArc(inA);
-                }
-                this->m_cGraph->DeleteNode(inP);
-                NodeIt = this->m_cGraph->DeleteNode((*NodeIt));
-                //this->m_cGraph->SaveAsDot("dot/steps/step"+std::to_string(this->GetNextCounter())+".dot");
-                this->DisplayProgress();
-                this->m_iRemovedInsertedTransitions++;
-                bReduced = true;
-                //return;
-            }
-            else
-            {
-                ++NodeIt;
-            }
-        }
-    }
-    while (bReduced);
-}
-
-
-bool CWFReducer::CanRemoveInsertedTransition(tNode * cTransition)
-{
-    tNodeSet * inPlaces =  cTransition->GetInNeighbors();
-    tNodeSet * outPlaces =  cTransition->GetOutNeighbors();
-    if(inPlaces->size() != 1 || outPlaces->size() != 1)
-    {
-        return false;
-    }
-    //std::cout << "***CanRemoveInsertedTransition: " << cTransition->GetLabel() << std::endl;
-
-
-    tNode * inP = (*inPlaces->begin());
-    tNode * outP = (*outPlaces->begin());
-    //std::cout << "***inP: " << inP->GetLabel() << std::endl;
-    //std::cout << "***outP: " << outP->GetLabel() << std::endl;
-    if(inP->GetLabel() == "i" || inP->GetLabel() == "o")
-    {
-        if(this->m_cGraph->GetNodes()->size() == 3)
-        {
-            return true;
-        }
-        return false;
-    }
-    //std::cout << "test: " << outP->GetLabel() << std::endl;
-    //tNode * outP = (*outPlaces->begin());
-    tNodeSet * inPoutT =  inP->GetOutNeighbors();
-    tNodeSet * inPinT = inP->GetInNeighbors();
-
-    //tNodeSet * outPoutT =  outP->GetOutNeighbors();
-    tNodeSet * outPinT = outP->GetInNeighbors();
-
-    if(inPoutT->size() != 1)
-    {
-        return false;
-    }
-
-    for (tNodeSetIt NodeOuIt = outPinT->begin(); NodeOuIt != outPinT->end(); ++NodeOuIt)
-    {
-        if(inPinT->find(*NodeOuIt) != inPinT->end())
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void CWFReducer::TryRemoveAllSelfloopTransitions()
 {
     bool bReduced;
@@ -874,6 +706,12 @@ bool CWFReducer::CanRemoveConvergentPlace(tNode * cPlace)
 
     tNode * inT = (*inTransitions->begin());
     tNodeSet * inToutP = inT->GetOutNeighbors();
+    /*if(inToutP->size() == 1)
+    {
+        std::cout << "CanRemoveConvergentPlace: " << (cPlace)->GetLabel() << std::endl;
+        return false;
+        //return true;
+    }*/
 
     tNodeSet * outTransitions =  cPlace->GetOutNeighbors();
 

@@ -34,14 +34,6 @@ public:
     {
         return this->m_iRemovedTransitions;
     }
-    int GetRemovedInsertedPlaces()
-    {
-        return this->m_iRemovedInsertedPlaces;
-    }
-    int GetRemovedInsertedTransitions()
-    {
-        return this->m_iRemovedInsertedTransitions;
-    }
     int GetRemovedSelfloopTransitions()
     {
         return this->m_iRemovedSelfloopTransitions;
@@ -69,14 +61,6 @@ private:
     bool CanRemoveTransition(tNode * cTransition);
     bool TransitionEquivalentToSetOfTransitions(tNode * cT, tNodeSet * sSet);
     int m_iRemovedTransitions;
-
-    void TryRemoveAllInsertedPlaces();
-    bool CanRemoveInsertedPlace(tNode * cPlace);
-    int m_iRemovedInsertedPlaces;
-
-    void TryRemoveAllInsertedTransitions();
-    bool CanRemoveInsertedTransition(tNode * cTransition);
-    int m_iRemovedInsertedTransitions;
 
     void TryRemoveAllSelfloopTransitions();
     bool CanRemoveSelfloopTransition(tNode * cTransition);
