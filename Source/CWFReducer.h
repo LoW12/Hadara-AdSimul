@@ -74,7 +74,7 @@ private:
     bool CanRemoveDivergentPlace(tNode * cPlace);
     int m_iRemovedDivergentPlaces;
 
-    bool HaveProducerOrConsumer(tNodeSet * cPlaces, tNode * cTransition);
+    bool HaveProducer(tNodeSet * cPlaces, tNode * cTransition);
     std::set<tNodeSet *> * GetSubSets(tNodeSet * sSet);
 
     int m_iTransitionLabel;

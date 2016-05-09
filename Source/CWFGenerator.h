@@ -51,25 +51,25 @@ private:
     int m_GenerationDuration;
 
     void ApplyCreatePlace(int iMax);
-    void CreatePlace(std::set<CGraph<int> *, CGraph_compare<int>> * cPlaces);
+    void CreatePlace(tNodeSet * cPlaces);
 
     void ApplyCreateSelfloop(int iMax);
-    void CreateSelfloop(std::set<CGraph<int> *, CGraph_compare<int>> * cPlaces);
+    void CreateSelfloop(tNodeSet * cPlaces);
 
     void ApplyCreateTransition(int iMax);
-    void CreateTransition(std::set<CGraph<int> *, CGraph_compare<int>> * cTransitions);
+    void CreateTransition(tNodeSet * cTransitions);
 
-    void InsertTransition(CGraph<int> * cSrcPlace);
+    void InsertTransition(tNode * cSrcPlace);
 
-    void InsertPalce(CGraph<int> * cSrcTransition);
+    void InsertPalce(tNode * cSrcTransition);
 
 
     void ApplyInsertConvergentPlaceTransition();
-    void InsertConvergentPlaceTransition(CGraph<int> * cPin, CGraph<int> * cPout, std::set<CGraph<int> *, CGraph_compare<int>> * cTransitions);
+    void InsertConvergentPlaceTransition(tNode * cPin, tNode * cPout, tNodeSet * cTransitions);
 
 
-    CGraph<int> * GetRandomTransition();
-    CGraph<int> * GetRandomPlace();
+    tNode * GetRandomTransition();
+    tNode * GetRandomPlace();
 
     std::mt19937 m_RNG;
     int GetRandomNumber(int iMin, int iMax);

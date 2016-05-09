@@ -181,8 +181,9 @@ bool CWFReducer::CanRemovePlace(tNode * cPlace)
     {
         return false;
     }
-
+    //std::cout << "sCandidates size : " << sCandidates->size() << std::endl;
     std::set<tNodeSet *> * sSubSet = this->GetSubSets(sCandidates);
+    //std::cout << "sSubSet size : " << sSubSet->size() << std::endl;
     for (std::set<tNodeSet *>::iterator setIt = sSubSet->begin(); setIt != sSubSet->end(); ++setIt)
     {
        if(this->PlaceEquivalentToSetOfPlaces(cPlace,(*setIt)))
@@ -322,12 +323,11 @@ bool CWFReducer::CanRemoveTransition(tNode * cTransition)
     }
     //std::cout << "quick check passed : " << cTransition->GetLabel() << std::endl;
 
-
     //find the source transition so that the transition can be activated if the source transition can
     bool bSourceFound = true;
     if(inPlaces->size() != 1 || (*inPlaces->begin())->GetLabel() != "i")
     {
-        bSourceFound = HaveProducerOrConsumer(inPlaces, cTransition);
+        bSourceFound = HaveProducer(inPlaces, cTransition);
     }
     //std::cout << "Source transition found : " << cTransition->GetLabel() << std::endl;
 
@@ -405,7 +405,9 @@ bool CWFReducer::CanRemoveTransition(tNode * cTransition)
     printSet(sCandidates);
     std::cout << std::endl;*/
     //std::cout << "Ok : " << sCandidates->size() << std::endl;
+    //std::cout << "sCandidates size : " << sCandidates->size() << std::endl;
     std::set<tNodeSet *> * sSubSet = this->GetSubSets(sCandidates);
+    //std::cout << "sSubSet size : " << sSubSet->size() << std::endl;
     for (std::set<tNodeSet *>::iterator setIt = sSubSet->begin(); setIt != sSubSet->end(); ++setIt)
     {
         if((*setIt)->size() == 1 || bSourceFound)
@@ -574,26 +576,23 @@ bool CWFReducer::CanRemoveSelfloopTransition(tNode * cTransition)
             return false;
         }
     }
-    //find ProducerOrConsumer if possible
-    return HaveProducerOrConsumer(outPlaces, cTransition);
+    //find Producer if possible
+    return HaveProducer(outPlaces, cTransition);
 }
 
 
 
-bool CWFReducer::HaveProducerOrConsumer(tNodeSet * cPlaces, tNode * cTransition)
+bool CWFReducer::HaveProducer(tNodeSet * cPlaces, tNode * cTransition)
 {
 
     std::map<tNode *, int, CGraph_compare<int>> * inTarget = new std::map<tNode *, int, CGraph_compare<int>>();
-    std::map<tNode *, int, CGraph_compare<int>> * outTarget = new std::map<tNode *, int, CGraph_compare<int>>();
 
     for ( tNodeSetIt NodeIt = cPlaces->begin(); NodeIt != cPlaces->end(); ++NodeIt)
     {
         tNodeSet * nodeInTransitions =  (*NodeIt)->GetInNeighbors();
-        tNodeSet * nodeOutTransitions =  (*NodeIt)->GetOutNeighbors();
-
         for ( tNodeSetIt NodeInIt = nodeInTransitions->begin(); NodeInIt != nodeInTransitions->end(); ++NodeInIt)
         {
-            if((*NodeInIt) != cTransition)
+            if((*NodeInIt)->GetLabel() != cTransition->GetLabel() )
             {
                 std::map<tNode *, int, CGraph_compare<int>>::iterator mapIt = inTarget->find(*NodeInIt);
                 if(mapIt == inTarget->end())
@@ -606,30 +605,8 @@ bool CWFReducer::HaveProducerOrConsumer(tNodeSet * cPlaces, tNode * cTransition)
                 }
             }
         }
-        for (tNodeSetIt NodeOuIt = nodeOutTransitions->begin(); NodeOuIt != nodeOutTransitions->end(); ++NodeOuIt)
-        {
-            if((*NodeOuIt) != cTransition)
-            {
-                std::map<tNode *, int, CGraph_compare<int>>::iterator mapIt = outTarget->find(*NodeOuIt);
-                if(mapIt == outTarget->end())
-                {
-                    outTarget->insert( std::pair<tNode *, int>((*NodeOuIt),1) );
-                }
-                else
-                {
-                    mapIt->second+=1;
-                }
-            }
-        }
     }
     for (std::map<tNode *, int, CGraph_compare<int>>::iterator mapIt = inTarget->begin(); mapIt != inTarget->end(); ++mapIt)
-    {
-        if(mapIt->second == cPlaces->size())
-        {
-            return true;
-        }
-    }
-    for (std::map<tNode *, int, CGraph_compare<int>>::iterator mapIt = outTarget->begin(); mapIt != outTarget->end(); ++mapIt)
     {
         if(mapIt->second == cPlaces->size())
         {
@@ -703,33 +680,49 @@ bool CWFReducer::CanRemoveConvergentPlace(tNode * cPlace)
         return false;
     }
 
+    bool bHardCheck = true;
 
     tNode * inT = (*inTransitions->begin());
+    tNodeSet * inTinP = inT->GetInNeighbors();
     tNodeSet * inToutP = inT->GetOutNeighbors();
-    /*if(inToutP->size() == 1)
+    if(inToutP->size() == 1)
     {
-        std::cout << "CanRemoveConvergentPlace: " << (cPlace)->GetLabel() << std::endl;
-        return false;
-        //return true;
-    }*/
+        bHardCheck = false;
+    }
 
     tNodeSet * outTransitions =  cPlace->GetOutNeighbors();
 
     for (tNodeSetIt NodeOuIt = outTransitions->begin(); NodeOuIt != outTransitions->end(); ++NodeOuIt)
     {
-        if((*NodeOuIt)->GetInNeighbors()->size() != 1)
+        if(bHardCheck)
         {
-            return false;
-        }
-        tNodeSet * NodeOuItoutP = (*NodeOuIt)->GetOutNeighbors();
-        for ( tNodeSetIt NodeIt = NodeOuItoutP->begin(); NodeIt != NodeOuItoutP->end(); ++NodeIt)
-        {
-            if(inToutP->find(*NodeIt) != inToutP->end())
+            tNodeSet * NodeOuItinP = (*NodeOuIt)->GetInNeighbors();
+            if(NodeOuItinP->size() != 1)
             {
                 return false;
             }
+            tNodeSet * NodeOuItoutP = (*NodeOuIt)->GetOutNeighbors();
+            for ( tNodeSetIt NodeIt = NodeOuItoutP->begin(); NodeIt != NodeOuItoutP->end(); ++NodeIt)
+            {
+                if(inToutP->find(*NodeIt) != inToutP->end())
+                {
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            tNodeSet * NodeOuItinP = (*NodeOuIt)->GetInNeighbors();
+            for ( tNodeSetIt NodeIt = NodeOuItinP->begin(); NodeIt != NodeOuItinP->end(); ++NodeIt)
+            {
+                if(inTinP->find(*NodeIt) != inTinP->end())
+                {
+                    return false;
+                }
+            }
         }
     }
+
     //std::cout << "CanRemoveConvergentPlace: " << (cPlace)->GetLabel() << std::endl;
     //return false;
     return true;
@@ -797,27 +790,45 @@ bool CWFReducer::CanRemoveDivergentPlace(tNode * cPlace)
         return false;
     }
 
+    bool bHardCheck = true;
 
     tNode * outT = (*outTransitions->begin());
-    tNodeSet * outToutP = outT->GetOutNeighbors();
-    if(outT->GetInNeighbors()->size() != 1)
+    tNodeSet * outTinP = outT->GetInNeighbors();
+    if(outTinP->size() == 1)
     {
-       return false;
+        bHardCheck = false;
     }
+    tNodeSet * outToutP = outT->GetOutNeighbors();
+
 
     tNodeSet * inTransitions =  cPlace->GetInNeighbors();
     for (tNodeSetIt NodeInIt = inTransitions->begin(); NodeInIt != inTransitions->end(); ++NodeInIt)
     {
-        /*if((*NodeInIt)->GetOutNeighbors()->size() != 1)
+        if(bHardCheck)
         {
-            return false;
-        }*/
-        tNodeSet * NodeInItoutP = (*NodeInIt)->GetOutNeighbors();
-        for ( tNodeSetIt NodeIt = NodeInItoutP->begin(); NodeIt != NodeInItoutP->end(); ++NodeIt)
-        {
-            if(outToutP->find(*NodeIt) != outToutP->end())
+            tNodeSet * NodeInItoutP = (*NodeInIt)->GetOutNeighbors();
+            if(NodeInItoutP->size() != 1)
             {
                 return false;
+            }
+            tNodeSet * NodeInItinP = (*NodeInIt)->GetInNeighbors();
+            for ( tNodeSetIt NodeIt = NodeInItinP->begin(); NodeIt != NodeInItinP->end(); ++NodeIt)
+            {
+                if(outTinP->find(*NodeIt) != outTinP->end())
+                {
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            tNodeSet * NodeInItoutP = (*NodeInIt)->GetOutNeighbors();
+            for ( tNodeSetIt NodeIt = NodeInItoutP->begin(); NodeIt != NodeInItoutP->end(); ++NodeIt)
+            {
+                if(outToutP->find(*NodeIt) != outToutP->end())
+                {
+                    return false;
+                }
             }
         }
     }
