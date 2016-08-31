@@ -19,6 +19,7 @@ How to compile
 ==============
 Compilation example : 
 
+- Edit z3's include and bin folder in CMakeLists.txt (z3 v4.3.2.6 available https://github.com/Z3Prover/z3)
 - cd bin/
 - cmake ..
 - make 

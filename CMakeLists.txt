@@ -1,36 +1,55 @@
-cmake_minimum_required(VERSION 2.8)
-project(Hadara_AdSimul)
+cmake_minimum_required(VERSION 3.2)
+project(AdSimul)
 
-add_definitions(-std=c++0x)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 
-set(SOURCE_FILES_GEN
-        Source/tinyxml2/tinyxml2.cpp
-        Source/CVars/CVarManager.cpp
-        Source/mainGen.cpp
-        Source/CGraph.cpp
-        Source/CGraphUtility.cpp
-        Source/CPetriNet.cpp
-        Source/CWFGenerator.cpp
+set(GEN_SOURCE_FILES
+    Source/tinyxml2/tinyxml2.cpp
+    Source/CVars/CVarManager.cpp
+    Source/CGraph/CGraph.cpp
+    Source/CGraph/CGraphUtility.cpp
+    Source/CGraph/CPetriNet.cpp
+    Source/CWFGenerator.cpp
+    Source/mainGen.cpp
  )
 
-set(SOURCE_FILES_RED
-        Source/tinyxml2/tinyxml2.cpp
-        Source/mainRed.cpp
-        Source/CGraph.cpp
-        Source/CGraphUtility.cpp
-        Source/CPetriNet.cpp
-        Source/CWFReducer.cpp
+add_executable(Hadara_AdSimul_Gen ${GEN_SOURCE_FILES})
+
+set(RED_SOURCE_FILES
+    Source/tinyxml2/tinyxml2.cpp
+    Source/CVars/CVarManager.cpp
+    Source/CGraph/CGraph.cpp
+    Source/CGraph/CGraphUtility.cpp
+    Source/CGraph/CPetriNet.cpp
+    Source/CWFReducer.cpp
+    Source/mainRed.cpp
  )
 
-set(SOURCE_FILES_TOSPIN
-         Source/tinyxml2/tinyxml2.cpp
-         Source/CVars/CVarManager.cpp
-         Source/mainToSpin.cpp
-         Source/CGraph.cpp
-         Source/CGraphUtility.cpp
-         Source/CPetriNet.cpp
-  )
+set(RED_WEB_SOURCE_FILES
+    Source/tinyxml2/tinyxml2.cpp
+    Source/CVars/CVarManager.cpp
+    Source/CGraph/CGraph.cpp
+    Source/CGraph/CGraphUtility.cpp
+    Source/CGraph/CPetriNet.cpp
+    Source/CWFReducer.cpp
+    Source/mainRedWeb.cpp
+ )
 
-add_executable(Hadara_AdSimul_Gen ${SOURCE_FILES_GEN})
-add_executable(Hadara_AdSimul_Red ${SOURCE_FILES_RED})
-add_executable(Hadara_AdSimul_ToSpin ${SOURCE_FILES_TOSPIN})
+set(RED_BATCH_SOURCE_FILES
+    Source/tinyxml2/tinyxml2.cpp
+    Source/CVars/CVarManager.cpp
+    Source/CGraph/CGraph.cpp
+    Source/CGraph/CGraphUtility.cpp
+    Source/CGraph/CPetriNet.cpp
+    Source/CWFReducer.cpp
+    Source/mainRedBatch.cpp
+ )
+
+include_directories("/home/low/Tools/z3-4.3.2.6/include")
+find_library(z3 z3 /home/low/Tools/z3-4.3.2.6/bin NO_DEFAULT_PATH)
+add_executable(Hadara_AdSimul_Red ${RED_SOURCE_FILES})
+target_link_libraries(Hadara_AdSimul_Red ${z3})
+add_executable(Hadara_AdSimul_Red_Web ${RED_WEB_SOURCE_FILES})
+target_link_libraries(Hadara_AdSimul_Red_Web ${z3})
+add_executable(Hadara_AdSimul_Red_Batch ${RED_BATCH_SOURCE_FILES})
+target_link_libraries(Hadara_AdSimul_Red_Batch ${z3})
