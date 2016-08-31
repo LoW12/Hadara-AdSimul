@@ -1,11 +1,12 @@
 #ifndef CGRAPH_H_
 #define CGRAPH_H_
 
-#include "LDException.h"
-#include "tinyxml2/tinyxml2.h"
+#include "../LDException.h"
+#include "../tinyxml2/tinyxml2.h"
 
 #include <string>
 #include <set>
+#include <map>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -164,8 +165,8 @@ public:
         this->m_vNodes = new std::set<CGraph<T> *, CGraph_compare<T>>();
         this->m_vArcs = new std::set<CArc<T> *, CArc_compare<T>>();
 
-        this->m_InNeighbors = new std::set<CGraph<T> *, CGraph_compare<T>>();
-        this->m_OutNeighbors = new std::set<CGraph<T> *, CGraph_compare<T>>();
+        this->m_InNeighbors = new std::map<CGraph<T> *, int, CGraph_compare<T>>();
+        this->m_OutNeighbors = new std::map<CGraph<T> *, int, CGraph_compare<T>>();
     }
 
     void SetParent(CGraph<T> *Node)
@@ -265,8 +266,8 @@ public:
                 throw new LDException("CGraph : AddArc, Target not in the graph(" + Arc->GetTarget()->GetLabel() + ")");
             }
             Arc->SetParent(this);
-            Arc->GetSource()->AddOutNeighbor(Arc->GetTarget());
-            Arc->GetTarget()->AddInNeighbor(Arc->GetSource());
+            Arc->GetSource()->AddOutNeighbor(Arc->GetTarget(), Arc->GetValue());
+            Arc->GetTarget()->AddInNeighbor(Arc->GetSource(), Arc->GetValue());
             this->m_vArcs->insert(Arc);
         }
         else
@@ -316,8 +317,8 @@ public:
         if(this->m_vArcs->find(Arc) != this->m_vArcs->end() )
         {
             Arc->UnSetParent();
-            Arc->GetSource()->DeleteOutNeighbor(Arc->GetTarget());
-            Arc->GetTarget()->DeleteInNeighbor(Arc->GetSource());
+            Arc->GetSource()->DeleteOutNeighbor(Arc->GetTarget(),Arc->GetValue());
+            Arc->GetTarget()->DeleteInNeighbor(Arc->GetSource(), Arc->GetValue());
             this->m_vArcs->erase(Arc);
         }
         else
@@ -334,36 +335,62 @@ public:
         }
     }
 
-    void AddInNeighbor(CGraph<T> *Node)
+    void AddInNeighbor(CGraph<T> *Node, int iValue)
     {
-        if(this->m_InNeighbors->find(Node) == this->m_InNeighbors->end() )
+        auto mapIt = this->m_InNeighbors->find(Node);
+        if(mapIt == this->m_InNeighbors->end())
         {
-            this->m_InNeighbors->insert(Node);
+            this->m_InNeighbors->insert( std::pair<CGraph<T> *, int>(Node,iValue) );
+        }
+        else
+        {
+            mapIt->second+=iValue;
         }
     }
 
-    void DeleteInNeighbor(CGraph<T> *Node)
+    void DeleteInNeighbor(CGraph<T> *Node, int iValue)
     {
-        if(this->m_InNeighbors->find(Node) != this->m_InNeighbors->end() )
+        auto mapIt = this->m_InNeighbors->find(Node);
+        if(mapIt != this->m_InNeighbors->end())
         {
-            this->m_InNeighbors->erase(Node);
+            if(mapIt->second == iValue)
+            {
+                this->m_InNeighbors->erase(mapIt);
+            }
+            else
+            {
+                mapIt->second-=iValue;
+            }
         }
     }
 
 
-    void AddOutNeighbor(CGraph<T> *Node)
+    void AddOutNeighbor(CGraph<T> *Node, int iValue)
     {
-        if(this->m_OutNeighbors->find(Node) == this->m_OutNeighbors->end() )
+        auto mapIt = this->m_OutNeighbors->find(Node);
+        if(mapIt == this->m_OutNeighbors->end())
         {
-            this->m_OutNeighbors->insert(Node);
+            this->m_OutNeighbors->insert( std::pair<CGraph<T> *, int>(Node,iValue));
+        }
+        else
+        {
+            mapIt->second+=iValue;
         }
     }
 
-    void DeleteOutNeighbor(CGraph<T> *Node)
+    void DeleteOutNeighbor(CGraph<T> *Node, int iValue)
     {
-        if(this->m_OutNeighbors->find(Node) != this->m_OutNeighbors->end() )
+        auto mapIt = this->m_OutNeighbors->find(Node);
+        if(mapIt != this->m_OutNeighbors->end())
         {
-            this->m_OutNeighbors->erase(Node);
+            if(mapIt->second == iValue)
+            {
+                this->m_OutNeighbors->erase(mapIt);
+            }
+            else
+            {
+                mapIt->second-=iValue;
+            }
         }
     }
 
@@ -390,58 +417,83 @@ public:
         return this->m_vArcs;
     }
 
-    std::set<CGraph<T> *, CGraph_compare<T>> *GetInNeighbors(int n=0)
+    bool bIsSink()
     {
+        return this->m_OutNeighbors->size() == 0;
+    }
+    bool bIsSource()
+    {
+        return this->m_InNeighbors->size() == 0;
+    }
 
-        std::set<CGraph<T> *, CGraph_compare<T>> * InNeighbors = new std::set<CGraph<T> *, CGraph_compare<T>>();
-        for (NodeItType NodeIt = this->m_InNeighbors->begin(); NodeIt != this->m_InNeighbors->end(); ++NodeIt)
+    std::map<CGraph<T> *, int, CGraph_compare<T>> *GetInNeighbors(int n=1, int iValue=0)
+    {
+        std::map<CGraph<T> *, int, CGraph_compare<T>> * InNeighbors = new std::map<CGraph<T> *, int, CGraph_compare<T>>();
+        for (auto NodeIt = this->m_InNeighbors->begin(); NodeIt != this->m_InNeighbors->end(); ++NodeIt)
         {
-            InNeighbors->insert(*NodeIt);
+            InNeighbors->insert( std::pair<CGraph<T> *, int>(NodeIt->first,iValue+NodeIt->second));
         }
-
-        if(n==0)
+        if(n<=1)
         {
             return InNeighbors;
         }
         else
         {
-            for (NodeItType NodeIt = this->m_InNeighbors->begin(); NodeIt != this->m_InNeighbors->end(); ++NodeIt)
+            for (auto NodeIt = this->m_InNeighbors->begin(); NodeIt != this->m_InNeighbors->end(); ++NodeIt)
             {
-                std::set<CGraph *, CGraph_compare<T>> *subInNeighbors = (*NodeIt)->GetInNeighbors(n - 1);
-                for (NodeItType subNodeIt = subInNeighbors->begin(); subNodeIt != subInNeighbors->end(); ++subNodeIt)
+                std::map<CGraph<T> *, int, CGraph_compare<T>> *subInNeighbors = NodeIt->first->GetInNeighbors(n - 1, iValue+NodeIt->second);
+                for (auto subNodeIt = subInNeighbors->begin(); subNodeIt != subInNeighbors->end(); ++subNodeIt)
                 {
-                    if (InNeighbors->find(*subNodeIt) == InNeighbors->end())
+                    auto mapIt = InNeighbors->find(subNodeIt->first);
                     {
-                        InNeighbors->insert(*subNodeIt);
+                        if(mapIt == InNeighbors->end())
+                        {
+                            InNeighbors->insert( std::pair<CGraph<T> *, int>(subNodeIt->first,subNodeIt->second));
+                        }
+                        else
+                        {
+                            if(mapIt->second  > subNodeIt->second)
+                            {
+                                mapIt->second = subNodeIt->second;
+                            }
+                        }
                     }
                 }
             }
             return InNeighbors;
         }
     }
-
-    std::set<CGraph<T> *, CGraph_compare<T>> *GetOutNeighbors(int n=0)
+    std::map<CGraph<T> *, int, CGraph_compare<T>> *GetOutNeighbors(int n=1, int iValue=0)
     {
-        std::set<CGraph<T> *, CGraph_compare<T>> * OutNeighbors = new std::set<CGraph<T> *, CGraph_compare<T>>();
-        for (NodeItType NodeIt = this->m_OutNeighbors->begin(); NodeIt != this->m_OutNeighbors->end(); ++NodeIt)
+        std::map<CGraph<T> *, int, CGraph_compare<T>> * OutNeighbors = new std::map<CGraph<T> *, int, CGraph_compare<T>>();
+        for (auto NodeIt = this->m_OutNeighbors->begin(); NodeIt != this->m_OutNeighbors->end(); ++NodeIt)
         {
-            OutNeighbors->insert(*NodeIt);
+            OutNeighbors->insert( std::pair<CGraph<T> *, int>(NodeIt->first,iValue+NodeIt->second));
         }
-
-        if(n==0)
+        if(n<=1)
         {
             return OutNeighbors;
         }
         else
         {
-            for (NodeItType NodeIt = this->m_OutNeighbors->begin(); NodeIt != this->m_OutNeighbors->end(); ++NodeIt)
+            for (auto NodeIt = this->m_OutNeighbors->begin(); NodeIt != this->m_OutNeighbors->end(); ++NodeIt)
             {
-                std::set<CGraph<T> *, CGraph_compare<T>> *subOutNeighbors = (*NodeIt)->GetOutNeighbors(n - 1);
-                for (NodeItType subNodeIt = subOutNeighbors->begin(); subNodeIt != subOutNeighbors->end(); ++subNodeIt)
+                std::map<CGraph<T> *, int, CGraph_compare<T>> *subOutNeighbors = NodeIt->first->GetOutNeighbors(n - 1, iValue+NodeIt->second);
+                for (auto subNodeIt = subOutNeighbors->begin(); subNodeIt != subOutNeighbors->end(); ++subNodeIt)
                 {
-                    if (OutNeighbors->find(*subNodeIt) == OutNeighbors->end())
+                    auto mapIt = OutNeighbors->find(subNodeIt->first);
                     {
-                        OutNeighbors->insert(*subNodeIt);
+                        if(mapIt == OutNeighbors->end())
+                        {
+                            OutNeighbors->insert( std::pair<CGraph<T> *, int>(subNodeIt->first,subNodeIt->second));
+                        }
+                        else
+                        {
+                            if(mapIt->second  > subNodeIt->second)
+                            {
+                                mapIt->second = subNodeIt->second;
+                            }
+                        }
                     }
                 }
             }
@@ -449,14 +501,14 @@ public:
         }
     }
 
-    std::set<CGraph<T> *, CGraph_compare<T>> *GetAllNeighbors(int n=0)
+    std::map<CGraph<T> *, int, CGraph_compare<T>> *GetAllNeighbors(int n=1)
     {
-        std::set<CGraph<T> *, CGraph_compare<T>> * Neighbors = this->GetOutNeighbors(n);
-        std::set<CGraph<T> *, CGraph_compare<T>> * InNeighbors = this->GetInNeighbors(n);
+        std::map<CGraph<T> *, int, CGraph_compare<T>> * Neighbors = this->GetOutNeighbors(n);
+        std::map<CGraph<T> *, int, CGraph_compare<T>> * InNeighbors = this->GetInNeighbors(n);
 
-        for (NodeItType NodeIt = InNeighbors->begin(); NodeIt != InNeighbors->end(); ++NodeIt)
+        for (auto NodeIt = InNeighbors->begin(); NodeIt != InNeighbors->end(); ++NodeIt)
         {
-            if (Neighbors->find(*NodeIt) == Neighbors->end())
+            if (Neighbors->find(NodeIt->first) == Neighbors->end())
             {
                 Neighbors->insert(*NodeIt);
             }
@@ -534,8 +586,8 @@ protected:
     std::set<CGraph<T> *, CGraph_compare<T>> *m_vNodes;
     std::set<CArc<T> *, CArc_compare<T>> *m_vArcs;
 
-    std::set<CGraph<T> *, CGraph_compare<T>> *m_InNeighbors;
-    std::set<CGraph<T> *, CGraph_compare<T>> *m_OutNeighbors;
+    std::map<CGraph<T> *, int, CGraph_compare<T>> *m_InNeighbors;
+    std::map<CGraph<T> *, int, CGraph_compare<T>> *m_OutNeighbors;
 
 
     void RemoveRelatedArcs(CGraph<T> *Node)
@@ -547,8 +599,8 @@ protected:
                     || (*iter)->GetTarget()->GetLabel() == Node->GetLabel())
             {
                 (*iter)->UnSetParent();
-                (*iter)->GetSource()->DeleteOutNeighbor((*iter)->GetTarget());
-                (*iter)->GetTarget()->DeleteInNeighbor((*iter)->GetSource());
+                (*iter)->GetSource()->DeleteOutNeighbor((*iter)->GetTarget(),(*iter)->GetValue());
+                (*iter)->GetTarget()->DeleteInNeighbor((*iter)->GetSource(),(*iter)->GetValue());
                 iter = this->m_vArcs->erase(iter);
             }
             else
