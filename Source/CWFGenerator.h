@@ -6,8 +6,7 @@
 
 #include "IBase.h"
 #include "LDException.h"
-#include "CGraph.h"
-#include "CPetriNet.h"
+#include "CGraph/CPetriNet.h"
 #include "CVars/CVarManager.h"
 
 class CWFGenerator : public IBase
@@ -31,6 +30,11 @@ public:
         return this->m_GenerationDuration;
     }
 
+    void SetDebugMode(bool bDebugMode)
+    {
+        this->m_bDebugMode = bDebugMode;
+    }
+
 private:
     std::string m_sName;
 
@@ -39,34 +43,36 @@ private:
     int m_iMaxCreatePlace;
     int m_iMaxCreateSelfloop;
     int m_iMaxCreateTransition;
+    int m_iMaxSCCSize;
 
     int m_pCreatePlace;
-    int m_pCreateSelfloop;
     int m_pCreateTransition;
-    int m_pInsertTransition;
-    int m_pInsertPalce;
-    int m_pInsertConvergentPlaceTransition;
+    int m_pCreateSelfloop;
+
+    int m_pTransitionPlace;
+    int m_pPlaceTransition;
+
+    int m_pCreateSCC;
 
     CPetriNet * m_cGraph;
     int m_GenerationDuration;
 
-    void ApplyCreatePlace(int iMax);
+    void ApplyCreatePlace(int iMaxPlaces);
     void CreatePlace(tNodeSet * cPlaces);
 
-    void ApplyCreateSelfloop(int iMax);
-    void CreateSelfloop(tNodeSet * cPlaces);
-
-    void ApplyCreateTransition(int iMax);
+    void ApplyCreateTransition(int iMaxTransitions);
     void CreateTransition(tNodeSet * cTransitions);
 
-    void InsertTransition(tNode * cSrcPlace);
+    void ApplyCreateSelfloop(int iMaxCreateSelfloop);
+    void CreateSelfloop(tNodeMap * cPlaces);
 
-    void InsertPalce(tNode * cSrcTransition);
+    void ApplyCreateTransitionPlace();
+    void CreateTransitionPlace(tNode * cTransition);
 
+    void ApplyCreateSCC();
+    void CreateSCC(tNode * cPlace);
 
-    void ApplyInsertConvergentPlaceTransition();
-    void InsertConvergentPlaceTransition(tNode * cPin, tNode * cPout, tNodeSet * cTransitions);
-
+    std::set<tNodeSet *> * GetSubSets(tNodeSet * sSet);
 
     tNode * GetRandomTransition();
     tNode * GetRandomPlace();
@@ -75,20 +81,81 @@ private:
     int GetRandomNumber(int iMin, int iMax);
 
     int m_iTransitionLabel;
-    int GetNextTransitionLabel()
+    std::string GetNextTransitionLabel()
     {
-        return m_iTransitionLabel++;
+        return "t_"+std::to_string(m_iTransitionLabel++);
     }
     int m_iPlaceLabel;
-    int GetNextPlaceLabel()
+    std::string GetNextPlaceLabel()
     {
-        return m_iPlaceLabel++;
+        return "p_"+std::to_string(m_iPlaceLabel++);
     }
     int m_iArcLabel;
-    int GetNextArcLabel()
+    std::string GetNextArcLabel()
     {
-        return m_iArcLabel++;
+        return "a_"+std::to_string(m_iArcLabel++);
     }
+
+    int m_iStepLabel;
+    std::string GetNextStepLabel()
+    {
+        return this->m_cGraph->GetLabel()+"_genstep_"+std::to_string(m_iStepLabel++)+".dot";
+    }
+
+    bool m_bDebugMode;
+    bool isDebugMode()
+    {
+        return m_bDebugMode;
+    }
+
+
+    //DEBUG
+    void printSet(tNodeSet * sSet)
+    {
+        std::cout << "[" ;
+        bool bFirst = true;
+        for ( tNodeSetIt NodeIt = sSet->begin(); NodeIt != sSet->end(); ++NodeIt)
+        {
+            if(!bFirst)
+            {
+                std::cout << " , " ;
+            }
+            std::cout << (*NodeIt)->GetLabel() ;
+            bFirst = false;
+        }
+        std::cout << "]" << std::endl;
+    }
+    void printMap(tNodeMap * sSet)
+    {
+        std::cout << "[" ;
+        bool bFirst = true;
+        for ( tNodeMapIt NodeIt = sSet->begin(); NodeIt != sSet->end(); ++NodeIt)
+        {
+            if(!bFirst)
+            {
+                std::cout << " , " ;
+            }
+            std::cout << NodeIt->first->GetLabel() ;
+            bFirst = false;
+        }
+        std::cout << "]" << std::endl;
+    }
+    void printSetOfSet(std::set<tNodeSet *> * sSetOfSet)
+    {
+        std::cout << "[" ;
+        bool bFirst = true;
+        for (std::set<tNodeSet *>::iterator setIt = sSetOfSet->begin(); setIt != sSetOfSet->end(); ++setIt)
+        {
+            if(!bFirst)
+            {
+                std::cout << " , " ;
+            }
+            printSet(*setIt);
+            bFirst = false;
+        }
+        std::cout << "]" << std::endl;
+    }
+
 };
 
 

@@ -6,7 +6,9 @@
 
 #include "IBase.h"
 #include "LDException.h"
-#include "CPetriNet.h"
+#include "CGraph/CPetriNet.h"
+
+#include <z3++.h>
 
 class CWFReducer : public IBase
 {
@@ -22,85 +24,94 @@ public:
     {
         return m_cGraph;
     }
+
     int GetReductionDuration()
     {
         return this->m_ReductionDuration;
     }
-    int GetRemovedPlaces()
+
+    void TryRemoveAllPlaces();
+    bool CanRemovePlace(tNode * cPlace);
+    bool PlaceEquivalentToSetOfPlaces(tNode * cP, tNodeSet * sSet);
+    bool PlaceEquivalentToSetOfPlaces_Z3(tNode * cP, tNodeSet * sSet);
+
+    void TryRemoveAllTransitions();
+    bool CanRemoveTransition(tNode * cTransition);
+    bool TransitionEquivalentToSetOfTransitions(tNode * cT, tNodeSet * sSet, bool hasSource);
+    bool TransitionEquivalentToSetOfTransitions_Z3(tNode * cT, tNodeSet * sSet, bool hasSource);
+
+    void TryRemoveAllSelfloopTransitions();
+    bool CanRemoveSelfloopTransition(tNode * cTransition);
+
+    void TryRemoveAllConvergentPlaces();
+    bool CanRemoveConvergentPlace(tNode * cPlace);
+
+    void TryRemoveAllDivergentPlaces();
+    bool CanRemoveDivergentPlace(tNode * cPlace);
+
+    void TryRemoveAllSCCs();
+    void TarjanSCC(tNode * cPlace, tNodeMap * NodeIndex, tNodeMap * NodeLowLink, std::vector<tNode*> * Stack, int * iIndex, tNodeSet * cTransitions);
+    bool CanMergePlacesOfSCC(tNode * cPlaceA, tNode * cPlaceB);
+
+    bool HasProducer(tNode * cTransition);
+
+    void SetConsoleMode(bool bConsoleMode)
     {
-        return this->m_iRemovedPlaces;
+        this->m_bConsoleMode = bConsoleMode;
     }
-    int GetRemovedTransitions()
+    void SetDebugMode(bool bDebugMode)
     {
-        return this->m_iRemovedTransitions;
-    }
-    int GetRemovedSelfloopTransitions()
-    {
-        return this->m_iRemovedSelfloopTransitions;
-    }
-    int GetRemovedConvergentPlaces()
-    {
-        return this->m_iRemovedConvergentPlaces;
-    }
-    int GetRemovedDivergentPlaces()
-    {
-        return this->m_iRemovedDivergentPlaces;
+        this->m_bDebugMode = bDebugMode;
     }
 
 private:
     CPetriNet * m_cGraph;
 
-    void DisplayProgress();
-
-    void TryRemoveAllPlaces();
-    bool CanRemovePlace(tNode * cPlace);
-    bool PlaceEquivalentToSetOfPlaces(tNode * cP, tNodeSet * sSet);
-    int m_iRemovedPlaces;
-
-    void TryRemoveAllTransitions();
-    bool CanRemoveTransition(tNode * cTransition);
-    bool TransitionEquivalentToSetOfTransitions(tNode * cT, tNodeSet * sSet);
-    int m_iRemovedTransitions;
-
-    void TryRemoveAllSelfloopTransitions();
-    bool CanRemoveSelfloopTransition(tNode * cTransition);
-    int m_iRemovedSelfloopTransitions;
-
-    void TryRemoveAllConvergentPlaces();
-    bool CanRemoveConvergentPlace(tNode * cPlace);
-    int m_iRemovedConvergentPlaces;
-
-    void TryRemoveAllDivergentPlaces();
-    bool CanRemoveDivergentPlace(tNode * cPlace);
-    int m_iRemovedDivergentPlaces;
-
-    bool HaveProducer(tNodeSet * cPlaces, tNode * cTransition);
+    bool bIsInterEmpty(tNodeMap * A,tNodeMap * B);
+    bool bAreEqual(tNodeMap * A,tNodeMap * B);
     std::set<tNodeSet *> * GetSubSets(tNodeSet * sSet);
 
+    void DisplayProgress();
+
     int m_iTransitionLabel;
-    int GetNextTransitionLabel()
+    std::string GetNextTransitionLabel()
     {
-        return m_iTransitionLabel++;
+        return "rt_"+std::to_string(m_iTransitionLabel++);
     }
     int m_iPlaceLabel;
-    int GetNextPlaceLabel()
+    std::string GetNextPlaceLabel()
     {
-        return m_iPlaceLabel++;
+        return "rp_"+std::to_string(m_iPlaceLabel++);
     }
     int m_iArcLabel;
-    int GetNextArcLabel()
+    std::string GetNextArcLabel()
     {
-        return m_iArcLabel++;
+        return "ra_"+std::to_string(m_iArcLabel++);
     }
 
-    int m_iCounter;
-    int GetNextCounter()
+    int m_iStepLabel;
+    std::string GetNextStepLabel()
     {
-        return m_iCounter++;
+        return this->m_cGraph->GetLabel()+"_step_"+std::to_string(m_iStepLabel++)+".dot";
     }
 
     int m_InitialSize;
     int m_ReductionDuration;
+
+    bool m_bConsoleMode;
+    bool isConsoleMode()
+    {
+        return m_bConsoleMode;
+    }
+
+    bool m_bDebugMode;
+    bool isDebugMode()
+    {
+        return m_bDebugMode;
+    }
+
+
+
 };
 
 

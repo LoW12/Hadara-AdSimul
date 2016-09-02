@@ -1,9 +1,10 @@
 #include <iostream>
 #include <chrono>
 
-#include "CGraph.h"
-#include "CGraphUtility.h"
+#include "CGraph/CGraphUtility.h"
 #include "CWFReducer.h"
+
+
 
 
 void PrintLogo(std::string Version)
@@ -22,22 +23,23 @@ void PrintLogo(std::string Version)
 
     std::cout << std::endl << " *** Hadara - AdSimul - Red *** " <<  Version << std::endl << std::endl;
 }
+
 bool isAtomic(CPetriNet * cPetriNet)
 {
-    if(cPetriNet->GetNodes()->size() != 3)
+    if(cPetriNet->GetTransitions()->size() != 1 || cPetriNet->GetPlaces()->size() != 2 )
     {
         return false;
     }
 
     tNode * firstNode = *(cPetriNet->GetTransitions()->begin());
-    tNodeSet * inFirstNode = firstNode->GetInNeighbors();
-    tNodeSet * outFirstNode = firstNode->GetOutNeighbors();
+    tNodeMap * inFirstNode = firstNode->GetInNeighbors();
+    tNodeMap * outFirstNode = firstNode->GetOutNeighbors();
 
     if(inFirstNode->size() == 1 && outFirstNode->size()  == 1)
     {
-        tNode * i = *(inFirstNode->begin());
-        tNode * o = *(outFirstNode->begin());
-        if(i->GetInNeighbors()->size() == 0 && o->GetOutNeighbors()->size() == 0)
+        tNode * i = inFirstNode->begin()->first;
+        tNode * o = outFirstNode->begin()->first;
+        if(i->bIsSource() && o->bIsSink())
         {
             return true;
         }
@@ -49,7 +51,7 @@ int main(int argc, char* argv[])
 {
     try
     {
-        std::string Version = "Alpha 0.1.2";
+        std::string Version = "Alpha 2.0.0";
         PrintLogo(Version);
 
         if(argc != 2)
@@ -61,30 +63,30 @@ int main(int argc, char* argv[])
 
         CPetriNet * cGraph = CGraphUtility::GetPetriNetFromXML(sWFPath);
 
+        if(cGraph->IsFreeChoice())
+        {
+            cGraph->EnsureSingleSink();
+        }
+
         CWFReducer * cWFReducer = new CWFReducer(cGraph);
         cWFReducer->Initialize();
+        //cWFReducer->SetDebugMode(true);
 
-        std::cout << "Reducing workflow " << cGraph->GetLabel() << "(size : " << cGraph->GetNodes()->size() << ").." << std::endl;
+        std::cout << "Reducing workflow " << cGraph->GetLabel() << "(size : " << cGraph->GetNodes()->size() << " p : " << cGraph->GetPlaces()->size() << " t : " << cGraph->GetTransitions()->size() << ").." << std::endl;
 
         int initialSize = cGraph->GetNodes()->size();
-
+        /*bool bFreeChoice = cGraph->IsFreeChoice();
+        bool bExtendedFreeChoice = cGraph->IsExtendedFreeChoice();*/
         cWFReducer->ReduceWF();
 
-        std::cout << std::endl;
 
-        std::cout << "*RemovedPlaces: " << cWFReducer->GetRemovedPlaces() << std::endl;
-        std::cout << "*RemovedTransitions: " << cWFReducer->GetRemovedTransitions() << std::endl;
-        std::cout << "*RemovedSelfloopTransitions: " << cWFReducer->GetRemovedSelfloopTransitions() << std::endl;
-        std::cout << "*RemovedConvergentPlaces: " << cWFReducer->GetRemovedConvergentPlaces() << std::endl;
-        std::cout << "*RemovedDivergentPlaces: " << cWFReducer->GetRemovedDivergentPlaces() << std::endl;
 
-        std::cout << std::endl;
+        //std::cout << std::endl;
 
-        std::cout << "**Reduced workflow size: " << cWFReducer->GetReducedWF()->GetNodes()->size() << ")" << std::endl;
+        std::cout << "**Reduced workflow size: " << cWFReducer->GetReducedWF()->GetNodes()->size() << " p : " << cGraph->GetPlaces()->size() << " t : " << cGraph->GetTransitions()->size() << std::endl;
         std::cout << "**ReductionDuration t(ms): " << cWFReducer->GetReductionDuration() << std::endl;
 
         std::cout <<  std::endl;
-
         if(isAtomic(cWFReducer->GetReducedWF()))
         {
             std::cout <<  cGraph->GetLabel() << " is a generalised sound workflow ! **** SUCCESS ***" << std::endl;
@@ -93,19 +95,25 @@ int main(int argc, char* argv[])
         {
             std::cout << "Could not decide the generalised soundness of " <<  cGraph->GetLabel() << " !" << std::endl;
             cWFReducer->GetReducedWF()->SaveAsDot("dot/red_"+cWFReducer->GetReducedWF()->GetLabel()+".dot");
-            cWFReducer->GetReducedWF()->SaveAsXML("xml/red_"+cWFReducer->GetReducedWF()->GetLabel()+".xml");
+            //cWFReducer->GetReducedWF()->SaveAsXML("xml/red_"+cWFReducer->GetReducedWF()->GetLabel()+".xml");
         }
 
         std::cout <<  std::endl;
 
         /*std::ofstream outfile;
         outfile.open("results.txt", std::ios::app);
-        outfile << sWFPath << " " << initialSize << " " << cWFReducer->GetReductionDuration() << " " << cWFReducer->GetReducedWF()->GetNodes()->size() << std::endl;
-        */
+        float fCurrentProgress = 1- ((float)(cWFReducer->GetReducedWF()->GetNodes()->size())/(float)(initialSize));
+        //outfile << cGraph->GetLabel() << " " << bFreeChoice << " " << bExtendedFreeChoice << std::endl;
+        outfile << cGraph->GetLabel() << " " << initialSize << " " << cWFReducer->GetReducedWF()->GetNodes()->size() << " " << cWFReducer->GetReductionDuration() << " " << (fCurrentProgress*100) << " " << isAtomic(cWFReducer->GetReducedWF()) << std::endl;
+        outfile.close();*/
 
         cWFReducer->Terminate();
     }
     catch ( LDException * e )
+    {
+        std::cout << "LDException was caught: " << e->what() << "\n";
+    }
+    catch ( std::exception * e )
     {
         std::cout << "Exception was caught: " << e->what() << "\n";
     }

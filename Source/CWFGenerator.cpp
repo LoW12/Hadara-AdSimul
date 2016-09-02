@@ -7,16 +7,20 @@ CWFGenerator::CWFGenerator(std::string sName, CVarManager *cVarManager, int iIte
     this->m_sName = sName;
     this->m_iIteration = iIteration;
 
-    this->m_iMaxCreatePlace = cVarManager->GetCVarByName<int>("iMaxCreatePlace")->GetValue();;
-    this->m_iMaxCreateSelfloop = cVarManager->GetCVarByName<int>("iMaxCreateSelfloop")->GetValue();;
-    this->m_iMaxCreateTransition = cVarManager->GetCVarByName<int>("iMaxCreateTransition")->GetValue();;
+    this->m_iMaxCreatePlace = cVarManager->GetCVarByName<int>("iMaxCreatePlace")->GetValue();
+    this->m_pCreatePlace = cVarManager->GetCVarByName<int>("pCreatePlace")->GetValue();
 
-    this->m_pCreatePlace = cVarManager->GetCVarByName<int>("pCreatePlace")->GetValue();;
-    this->m_pCreateSelfloop = cVarManager->GetCVarByName<int>("pCreateSelfloop")->GetValue();;
-    this->m_pCreateTransition = cVarManager->GetCVarByName<int>("pCreateTransition")->GetValue();;
-    this->m_pInsertTransition = cVarManager->GetCVarByName<int>("pInsertTransition")->GetValue();;
-    this->m_pInsertPalce = cVarManager->GetCVarByName<int>("pInsertPalce")->GetValue();;
-    this->m_pInsertConvergentPlaceTransition = cVarManager->GetCVarByName<int>("pInsertConvergentPlaceTransition")->GetValue();;
+    this->m_iMaxCreateTransition = cVarManager->GetCVarByName<int>("iMaxCreateTransition")->GetValue();
+    this->m_pCreateTransition = cVarManager->GetCVarByName<int>("pCreateTransition")->GetValue();
+
+    this->m_iMaxCreateSelfloop = cVarManager->GetCVarByName<int>("iMaxCreateSelfloop")->GetValue();
+    this->m_pCreateSelfloop = cVarManager->GetCVarByName<int>("pCreateSelfloop")->GetValue();
+
+    this->m_pTransitionPlace = cVarManager->GetCVarByName<int>("pTransitionPlace")->GetValue();
+    this->m_pPlaceTransition = cVarManager->GetCVarByName<int>("pPlaceTransition")->GetValue();
+
+    this->m_iMaxSCCSize = cVarManager->GetCVarByName<int>("iMaxSCCSize")->GetValue();
+    this->m_pCreateSCC = cVarManager->GetCVarByName<int>("pCreateSCC")->GetValue();
 
     this->m_iTransitionLabel = 0;
     this->m_iPlaceLabel = 0;
@@ -27,6 +31,8 @@ CWFGenerator::CWFGenerator(std::string sName, CVarManager *cVarManager, int iIte
     this->m_GenerationDuration = 0;
 
     this->m_RNG.seed(time(NULL));
+
+    this->m_bDebugMode = false;
 }
 
 void CWFGenerator::Initialize()
@@ -38,35 +44,41 @@ void CWFGenerator::GenerateWF()
 {
     auto tBefore = std::chrono::high_resolution_clock::now();
 
+    //Basic workflow setup
+
     tNode * iPlace = new tNode("Place","i");
     this->m_cGraph->AddNode(iPlace);
 
     tNode * oPlace = new tNode("Place","o");
     this->m_cGraph->AddNode(oPlace);
 
-    tNode * mPlace = new tNode("Place","m");
+    tNode * mPlace = new tNode("Place",this->GetNextPlaceLabel());
     this->m_cGraph->AddNode(mPlace);
 
-    tNode * bTransition1 = new tNode("Transition","bT1");
+    tNode * bTransition1 = new tNode("Transition",this->GetNextTransitionLabel());
     this->m_cGraph->AddNode(bTransition1);
 
-    tNode * bTransition2 = new tNode("Transition","bT2");
+    tNode * bTransition2 = new tNode("Transition",this->GetNextTransitionLabel());
     this->m_cGraph->AddNode(bTransition2);
 
-    CArc<int> * iToT1 = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),iPlace,bTransition1,1);
+    CArc<int> * iToT1 = new CArc<int>("Arc",this->GetNextArcLabel(),iPlace,bTransition1,1);
     this->m_cGraph->AddArc(iToT1);
 
-    CArc<int> * T1tom = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),bTransition1,mPlace,1);
+    CArc<int> * T1tom = new CArc<int>("Arc",this->GetNextArcLabel(),bTransition1,mPlace,1);
     this->m_cGraph->AddArc(T1tom);
 
-    CArc<int> * mToT2 = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),mPlace,bTransition2,1);
+    CArc<int> * mToT2 = new CArc<int>("Arc",this->GetNextArcLabel(),mPlace,bTransition2,1);
     this->m_cGraph->AddArc(mToT2);
 
-    CArc<int> * T2too = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),bTransition2,oPlace,1);
+    CArc<int> * T2too = new CArc<int>("Arc",this->GetNextArcLabel(),bTransition2,oPlace,1);
     this->m_cGraph->AddArc(T2too);
 
+    if(this->isDebugMode())
+    {
+        this->m_cGraph->SaveAsDot("dot/steps/"+this->GetNextStepLabel());
+    }
 
-    int pTotal = this->m_pCreatePlace + this->m_pCreateSelfloop + this->m_pCreateTransition + this->m_pInsertTransition + this->m_pInsertPalce + this->m_pInsertConvergentPlaceTransition;
+    int pTotal = this->m_pCreatePlace  + this->m_pCreateTransition + this->m_pCreateSelfloop + this->m_pTransitionPlace + this->m_pCreateSCC;
 
     float fDisplayedProgress = 0;
     int barWidth = 70;
@@ -93,155 +105,148 @@ void CWFGenerator::GenerateWF()
         {
             this->ApplyCreatePlace(this->m_iMaxCreatePlace);
         }
-        else if(iRand < this->m_pCreatePlace + this->m_pCreateSelfloop)
-        {
-            this->ApplyCreateSelfloop(this->m_iMaxCreateSelfloop);
-        }
-        else if(iRand < this->m_pCreatePlace + this->m_pCreateSelfloop + this->m_pCreateTransition)
+        else if(iRand < this->m_pCreatePlace + this->m_pCreateTransition)
         {
             this->ApplyCreateTransition(this->m_iMaxCreateTransition);
         }
-        else if(iRand < this->m_pCreatePlace + this->m_pCreateSelfloop + this->m_pCreateTransition + this->m_pInsertTransition)
+        else if(iRand < this->m_pCreatePlace + this->m_pCreateTransition + this->m_pCreateSelfloop)
         {
-            this->InsertTransition(this->GetRandomPlace());
+            this->ApplyCreateSelfloop(this->m_iMaxCreateSelfloop);
         }
-        else if(iRand < this->m_pCreatePlace + this->m_pCreateSelfloop + this->m_pCreateTransition + this->m_pInsertTransition + this->m_pInsertPalce)
+        else if(iRand < this->m_pCreatePlace + this->m_pCreateTransition + this->m_pCreateSelfloop + this->m_pTransitionPlace)
         {
-            this->InsertPalce(this->GetRandomTransition());
+            this->ApplyCreateTransitionPlace();
         }
-        else
+        else if(iRand < this->m_pCreatePlace + this->m_pCreateTransition + this->m_pCreateSelfloop + this->m_pTransitionPlace + this->m_pCreateSCC)
         {
-            this->ApplyInsertConvergentPlaceTransition();
+            this->ApplyCreateSCC();
         }
+        /*else if(iRand < this->m_pCreatePlace  + this->m_pCreateTransition + this->m_pInsertPalce)
+        {
+            this->ApplyInsertPalce(this->m_iMaxWeight);
+        }
+        else if(iRand < this->m_pCreatePlace  + this->m_pCreateTransition + this->m_pInsertPalce + this->m_pInsertTransition)
+        {
+            this->ApplyInsertTransition(this->m_iMaxWeight);
+        }
+        else if(iRand < this->m_pCreatePlace + this->m_pCreateSelfloop)
+        {
+           this->ApplyCreateSelfloop(this->m_iMaxCreateSelfloop);
+        }*/
     }
-
-
-
     std::cout << std::endl;
     auto tAfter = std::chrono::high_resolution_clock::now();
     this->m_GenerationDuration = std::chrono::duration_cast<std::chrono::milliseconds>(tAfter - tBefore).count();
 }
 
-void CWFGenerator::ApplyCreatePlace(int iMax)
+void CWFGenerator::ApplyCreatePlace(int iMaxPlaces)
 {
-    if(this->m_cGraph->GetPlaces()->size() < 2 + iMax)
+    if(this->m_cGraph->GetPlaces()->size() < 2 + iMaxPlaces)
     {
-        iMax = this->m_cGraph->GetPlaces()->size() - 2;
+        iMaxPlaces = this->m_cGraph->GetPlaces()->size() - 2;
+    }
+    if(iMaxPlaces <= 0)
+    {
+        return;
     }
 
     tNodeSet * cPlaces = new tNodeSet();
-    int iRand = this->GetRandomNumber(1,iMax);
+    int iRand = this->GetRandomNumber(1,iMaxPlaces);
     while(cPlaces->size() != iRand)
     {
         cPlaces->insert(this->GetRandomPlace());
     }
     this->CreatePlace(cPlaces);
+
 }
 
 void CWFGenerator::CreatePlace(tNodeSet * cPlaces)
 {
-    tNodeSet * finalInTransitions =  new tNodeSet();
-    tNodeSet * finalOutTransitions =  new tNodeSet();
+    tNodeMap * finalInTransitions =  new tNodeMap();
+    tNodeMap * finalOutTransitions =  new tNodeMap();
 
     for ( tNodeSetIt NodeIt = cPlaces->begin(); NodeIt != cPlaces->end(); ++NodeIt)
     {
-        tNodeSet * inTransitions =  (*NodeIt)->GetInNeighbors();
-        tNodeSet * outTransitions =  (*NodeIt)->GetOutNeighbors();
+        tNodeMap * inTransitions =  (*NodeIt)->GetInNeighbors();
+        tNodeMap * outTransitions =  (*NodeIt)->GetOutNeighbors();
 
-        for ( tNodeSetIt NodeInIt = inTransitions->begin(); NodeInIt != inTransitions->end(); ++NodeInIt)
+        for ( tNodeMapIt NodeInIt = inTransitions->begin(); NodeInIt != inTransitions->end(); ++NodeInIt)
         {
-            if(finalInTransitions->find(*NodeInIt) != finalInTransitions->end())
+            tNodeMapIt mapIt = finalInTransitions->find(NodeInIt->first);
+            if(mapIt == finalInTransitions->end())
             {
+                finalInTransitions->insert( std::pair<CGraph<int> *, int>(NodeInIt->first,NodeInIt->second) );
+            }
+            else
+            {
+                //mapIt->second += NodeInIt->second;
                 return;
             }
-            finalInTransitions->insert(*NodeInIt);
         }
-        for (tNodeSetIt NodeOuIt = outTransitions->begin(); NodeOuIt != outTransitions->end(); ++NodeOuIt)
+        for (tNodeMapIt NodeOuIt = outTransitions->begin(); NodeOuIt != outTransitions->end(); ++NodeOuIt)
         {
-            if(finalOutTransitions->find(*NodeOuIt) != finalOutTransitions->end())
+            tNodeMapIt mapIt = finalOutTransitions->find(NodeOuIt->first);
+            if(mapIt == finalOutTransitions->end())
             {
+                finalOutTransitions->insert( std::pair<CGraph<int> *, int>(NodeOuIt->first,NodeOuIt->second) );
+            }
+            else
+            {
+                //mapIt->second += NodeOuIt->second;
                 return;
             }
-            finalOutTransitions->insert(*NodeOuIt);
         }
     }
 
-    tNode * cNewPlace = new tNode("Place","p_"+std::to_string(this->GetNextPlaceLabel()));
+    tNode * cNewPlace = new tNode("Place",this->GetNextPlaceLabel());
     this->m_cGraph->AddNode(cNewPlace);
-    for ( tNodeSetIt NodeInIt = finalInTransitions->begin(); NodeInIt != finalInTransitions->end(); ++NodeInIt)
+    for ( tNodeMapIt NodeInIt = finalInTransitions->begin(); NodeInIt != finalInTransitions->end(); ++NodeInIt)
     {
-        CArc<int> *inA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), (*NodeInIt), cNewPlace, 1);
+        CArc<int> *inA = new CArc<int>("Arc", this->GetNextArcLabel(), NodeInIt->first, cNewPlace, NodeInIt->second);
         this->m_cGraph->AddArc(inA);
     }
-    for (tNodeSetIt NodeOuIt = finalOutTransitions->begin(); NodeOuIt != finalOutTransitions->end(); ++NodeOuIt)
+    for (tNodeMapIt NodeOuIt = finalOutTransitions->begin(); NodeOuIt != finalOutTransitions->end(); ++NodeOuIt)
     {
-        CArc<int> *outA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), cNewPlace, (*NodeOuIt), 1);
+        CArc<int> *outA = new CArc<int>("Arc", this->GetNextArcLabel(), cNewPlace, NodeOuIt->first, NodeOuIt->second);
         this->m_cGraph->AddArc(outA);
     }
-}
-
-void CWFGenerator::ApplyCreateSelfloop(int iMax)
-{
-    tNodeSet * cPlaces;
-
-    tNode * cT = this->GetRandomTransition();
-
-    cPlaces = cT->GetOutNeighbors();
-    if(cPlaces->size() == 1 && (*(cPlaces->begin()))->GetLabel() == "o")
+    if(this->isDebugMode())
     {
-        return;
-    }
-
-    while(cPlaces->size() > iMax)
-    {
-        int iRandPalce = this->GetRandomNumber(0,cPlaces->size()-1);
-        tNodeSetIt NodeIt = cPlaces->begin();
-        std::advance(NodeIt,iRandPalce);
-        cPlaces->erase(NodeIt);
-    }
-    this->CreateSelfloop(cPlaces);
-}
-
-void CWFGenerator::CreateSelfloop(tNodeSet * cPlaces)
-{
-    tNode * cNewT = new tNode("Transition","t_"+std::to_string(this->GetNextTransitionLabel()));
-    this->m_cGraph->AddNode(cNewT);
-
-    for ( tNodeSetIt NodeIt = cPlaces->begin(); NodeIt != cPlaces->end(); ++NodeIt)
-    {
-        CArc<int> *inA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), (*NodeIt), cNewT, 1);
-        this->m_cGraph->AddArc(inA);
-        CArc<int> *outA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), cNewT, (*NodeIt), 1);
-        this->m_cGraph->AddArc(outA);
+        std::cout << "New place: " ;
+        this->printSet(cPlaces);
+        this->m_cGraph->SaveAsDot("dot/steps/"+this->GetNextStepLabel());
     }
 }
 
-void CWFGenerator::ApplyCreateTransition(int iMax)
+void CWFGenerator::ApplyCreateTransition(int iMaxTransitions)
 {
 
     tNode *cT = this->GetRandomTransition();
 
-    tNodeSet * CToutPlaces =  cT->GetOutNeighbors();
+    tNodeMap * cToutPlaces =  cT->GetOutNeighbors();
 
     tNodeSet * sCandidates =  new tNodeSet();
     //Agregate canditate transitions
-    for ( tNodeSetIt NodeIt = CToutPlaces->begin(); NodeIt != CToutPlaces->end(); ++NodeIt)
+    for ( tNodeMapIt NodeIt = cToutPlaces->begin(); NodeIt != cToutPlaces->end(); ++NodeIt)
     {
-        tNodeSet * outTransitions = (*NodeIt)->GetOutNeighbors();
-        for (tNodeSetIt NodeOuIt = outTransitions->begin(); NodeOuIt != outTransitions->end(); ++NodeOuIt)
+        tNodeMap * outTransitions = NodeIt->first->GetOutNeighbors();
+        for (tNodeMapIt NodeOuIt = outTransitions->begin(); NodeOuIt != outTransitions->end(); ++NodeOuIt)
         {
-            sCandidates->insert(*NodeOuIt);
+            if(NodeOuIt->second <= NodeIt->second)
+            {
+                sCandidates->insert(NodeOuIt->first);
+            }
         }
     }
-    //Check candidates input places mutual exclusions
+    //Delete unsatifying candidate
     tNodeSetIt NodeIt = sCandidates->begin();
     while (NodeIt != sCandidates->end())
     {
         bool toRemove = false;
-        tNodeSet * inPlaces = (*NodeIt)->GetInNeighbors();
-        for (tNodeSetIt NodeInIt = inPlaces->begin(); NodeInIt != inPlaces->end(); ++NodeInIt)
+        tNodeMap * inPlaces =  (*NodeIt)->GetInNeighbors();
+        for ( tNodeMapIt NodeInIt = inPlaces->begin(); NodeInIt != inPlaces->end(); ++NodeInIt)
         {
-            if(CToutPlaces->find(*NodeInIt) == CToutPlaces->end())
+            if(cToutPlaces->find(NodeInIt->first) == cToutPlaces->end())
             {
                 toRemove = true;
                 break;
@@ -253,9 +258,9 @@ void CWFGenerator::ApplyCreateTransition(int iMax)
         }
         else
         {
-            for (tNodeSetIt NodeInIt = inPlaces->begin(); NodeInIt != inPlaces->end(); ++NodeInIt)
+            for (tNodeMapIt NodeInIt = inPlaces->begin(); NodeInIt != inPlaces->end(); ++NodeInIt)
             {
-                CToutPlaces->erase(*NodeInIt);
+                cToutPlaces->erase(NodeInIt->first);
             }
             ++NodeIt;
         }
@@ -266,7 +271,8 @@ void CWFGenerator::ApplyCreateTransition(int iMax)
         return;
     }
 
-    while(sCandidates->size() > iMax)
+    int iRand = this->GetRandomNumber(1,iMaxTransitions);
+    while(sCandidates->size() > iRand)
     {
         int iRandTransition = this->GetRandomNumber(0,sCandidates->size()-1);
         tNodeSetIt NodeIt = sCandidates->begin();
@@ -279,280 +285,341 @@ void CWFGenerator::ApplyCreateTransition(int iMax)
 
 void CWFGenerator::CreateTransition(tNodeSet * cTransitions)
 {
-    tNode * cNewT = new tNode("Transition","t_"+std::to_string(this->GetNextTransitionLabel()));
+    tNode * cNewT = new tNode("Transition", this->GetNextTransitionLabel());
     this->m_cGraph->AddNode(cNewT);
 
-    tNodeSet * finalInPlaces =  new tNodeSet();
-    tNodeSet * finalOutPlaces =  new tNodeSet();
+    tNodeMap * finalInPlaces =  new tNodeMap();
+    tNodeMap * finalOutPlaces =  new tNodeMap();
 
     for ( tNodeSetIt NodeIt = cTransitions->begin(); NodeIt != cTransitions->end(); ++NodeIt)
     {
-        tNodeSet * inPlaces =  (*NodeIt)->GetInNeighbors();
-        tNodeSet * outPlaces =  (*NodeIt)->GetOutNeighbors();
+        tNodeMap * inPlaces =  (*NodeIt)->GetInNeighbors();
+        tNodeMap * outPlaces =  (*NodeIt)->GetOutNeighbors();
 
-        for ( tNodeSetIt NodeInIt = inPlaces->begin(); NodeInIt != inPlaces->end(); ++NodeInIt)
+        for ( tNodeMapIt NodeInIt = inPlaces->begin(); NodeInIt != inPlaces->end(); ++NodeInIt)
         {
-            finalInPlaces->insert(*NodeInIt);
-        }
-        for (tNodeSetIt NodeOuIt = outPlaces->begin(); NodeOuIt != outPlaces->end(); ++NodeOuIt)
-        {
-            finalOutPlaces->insert(*NodeOuIt);
-        }
-    }
-
-
-    for ( tNodeSetIt NodeInIt = finalInPlaces->begin(); NodeInIt != finalInPlaces->end(); ++NodeInIt)
-    {
-        CArc<int> *inA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), (*NodeInIt), cNewT, 1);
-        this->m_cGraph->AddArc(inA);
-    }
-    for (tNodeSetIt NodeOuIt = finalOutPlaces->begin(); NodeOuIt != finalOutPlaces->end(); ++NodeOuIt)
-    {
-        CArc<int> *outA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), cNewT, (*NodeOuIt), 1);
-        this->m_cGraph->AddArc(outA);
-    }
-}
-
-void CWFGenerator::InsertTransition(tNode * cSrcPlace)
-{
-    if(this->m_cGraph->GetPlaces()->find(cSrcPlace) == this->m_cGraph->GetNodes()->end() )
-    {
-        throw new LDException("CWFGenerator : InsertTransitions, Place("+ cSrcPlace->GetLabel() +") isn't in the graph");
-    }
-    else
-    {
-        tNodeSet * inTransitions =  cSrcPlace->GetInNeighbors();
-        tNodeSet * outTransitions =  cSrcPlace->GetOutNeighbors();
-
-        //remove place
-        this->m_cGraph->DeleteNode(cSrcPlace);
-
-
-        //add 1st place
-        tNode * cP1 = new tNode("Place","p_"+std::to_string(this->GetNextPlaceLabel()));
-        this->m_cGraph->AddNode(cP1);
-        //add 2nd place
-        tNode * cP2 = new tNode("Place","p_"+std::to_string(this->GetNextPlaceLabel()));
-        this->m_cGraph->AddNode(cP2);
-
-        //add inputs
-        if(inTransitions->size() > 0)
-        {
-            int iRandTransition = this->GetRandomNumber(0,inTransitions->size()-1);
-            tNodeSetIt NodeIt = inTransitions->begin();
-            std::advance(NodeIt,iRandTransition);
-            CArc<int> * sinA = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),(*NodeIt),cP1,1);
-            this->m_cGraph->AddArc(sinA);
-            inTransitions->erase(NodeIt);
-            for ( tNodeSetIt NodeInIt = inTransitions->begin(); NodeInIt != inTransitions->end(); ++NodeInIt)
+            tNodeMapIt mapIt = finalInPlaces->find(NodeInIt->first);
+            if(mapIt == finalInPlaces->end())
             {
-                int iRand = this->GetRandomNumber(0,99);
-                if(iRand<50)
-                {
-                    CArc<int> * inA = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),(*NodeInIt),cP1,1);
-                    this->m_cGraph->AddArc(inA);
-                }
-                else
-                {
-                    CArc<int> * inA = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),(*NodeInIt),cP2,1);
-                    this->m_cGraph->AddArc(inA);
-                }
-            }
-        }
-
-
-        //add outputs
-        if(outTransitions->size() > 0)
-        {
-           /* int iRandTransition = this->GetRandomNumber(0, outTransitions->size() - 1);
-            tNodeSetIt NodeIt = outTransitions->begin();
-            std::advance(NodeIt, iRandTransition);
-            CArc<int> *soutA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), cP2, (*NodeIt), 1);
-            this->m_cGraph->AddArc(soutA);
-            outTransitions->erase(NodeIt);*/
-            for (tNodeSetIt NodeOuIt = outTransitions->begin(); NodeOuIt != outTransitions->end(); ++NodeOuIt)
-            {
-                CArc<int> *outA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), cP2, (*NodeOuIt), 1);
-                this->m_cGraph->AddArc(outA);
-
-            }
-        }
-
-        //add transition
-        tNode * cT = new tNode("Transition","t_"+std::to_string(this->GetNextTransitionLabel()));
-        this->m_cGraph->AddNode(cT);
-
-        CArc<int> * inA = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),cP1,cT,1);
-        this->m_cGraph->AddArc(inA);
-        CArc<int> * outA = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),cT,cP2,1);
-        this->m_cGraph->AddArc(outA);
-    }
-}
-
-void CWFGenerator::InsertPalce(tNode * cSrcTransition)
-{
-   tNodeSet * inPlaces =  cSrcTransition->GetInNeighbors();
-    tNodeSet * outPlaces =  cSrcTransition->GetOutNeighbors();
-
-    //remove transition
-    this->m_cGraph->DeleteNode(cSrcTransition);
-
-
-    //add 1st transition
-    tNode * cT1 = new tNode("Transition","t_"+std::to_string(this->GetNextTransitionLabel()));
-    this->m_cGraph->AddNode(cT1);
-    //add 2nd transition
-    tNode * cT2 = new tNode("Transition","t_"+std::to_string(this->GetNextTransitionLabel()));
-    this->m_cGraph->AddNode(cT2);
-
-    //add inputs
-    if(inPlaces->size() > 0)
-    {
-       /* int iRandPlace = this->GetRandomNumber(0, inPlaces->size() - 1);
-        tNodeSetIt NodeIt = inPlaces->begin();
-        std::advance(NodeIt, iRandPlace);
-        CArc<int> *sinA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), (*NodeIt), cT1, 1);
-        this->m_cGraph->AddArc(sinA);
-        inPlaces->erase(NodeIt);*/
-        for (tNodeSetIt NodeInIt = inPlaces->begin();
-             NodeInIt != inPlaces->end(); ++NodeInIt)
-        {
-            CArc<int> *inA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), (*NodeInIt), cT1, 1);
-            this->m_cGraph->AddArc(inA);
-        }
-    }
-
-     //add outputs
-    if(outPlaces->size() > 0)
-    {
-        int iRandPlace = this->GetRandomNumber(0, outPlaces->size() - 1);
-        tNodeSetIt NodeIt = outPlaces->begin();
-        std::advance(NodeIt, iRandPlace);
-        CArc<int> *soutA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), cT2, (*NodeIt), 1);
-        this->m_cGraph->AddArc(soutA);
-        outPlaces->erase(NodeIt);
-        for (tNodeSetIt NodeOuIt = outPlaces->begin(); NodeOuIt != outPlaces->end(); ++NodeOuIt)
-        {
-            int iRand = this->GetRandomNumber(0, 99);
-            if (iRand < 50)
-            {
-                CArc<int> *outA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), cT1, (*NodeOuIt), 1);
-                this->m_cGraph->AddArc(outA);
+                finalInPlaces->insert( std::pair<CGraph<int> *, int>(NodeInIt->first,NodeInIt->second) );
             }
             else
             {
-                CArc<int> *outA = new CArc<int>("Arc", "a_" + std::to_string(this->GetNextArcLabel()), cT2, (*NodeOuIt), 1);
-                this->m_cGraph->AddArc(outA);
+                mapIt->second += NodeInIt->second;
+            }
+        }
+        for (tNodeMapIt NodeOuIt = outPlaces->begin(); NodeOuIt != outPlaces->end(); ++NodeOuIt)
+        {
+            tNodeMapIt mapIt = finalOutPlaces->find(NodeOuIt->first);
+            if(mapIt == finalOutPlaces->end())
+            {
+                finalOutPlaces->insert( std::pair<CGraph<int> *, int>(NodeOuIt->first,NodeOuIt->second) );
+            }
+            else
+            {
+                mapIt->second += NodeOuIt->second;
             }
         }
     }
 
-    tNode * cP = new tNode("Place","p_"+std::to_string(this->GetNextPlaceLabel()));
-    this->m_cGraph->AddNode(cP);
-
-    CArc<int> * inA = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),cT1,cP,1);
-    this->m_cGraph->AddArc(inA);
-    CArc<int> * outA = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),cP,cT2,1);
-    this->m_cGraph->AddArc(outA);
+    for (tNodeMapIt NodeInIt = finalInPlaces->begin(); NodeInIt != finalInPlaces->end(); ++NodeInIt)
+    {
+        CArc<int> *inA = new CArc<int>("Arc", this->GetNextArcLabel(), NodeInIt->first, cNewT, NodeInIt->second);
+        this->m_cGraph->AddArc(inA);
+    }
+    for (tNodeMapIt NodeOuIt = finalOutPlaces->begin(); NodeOuIt != finalOutPlaces->end(); ++NodeOuIt)
+    {
+        CArc<int> *outA = new CArc<int>("Arc", this->GetNextArcLabel(), cNewT, NodeOuIt->first, NodeOuIt->second);
+        this->m_cGraph->AddArc(outA);
+    }
+    if(this->isDebugMode())
+    {
+        std::cout << "New transition: ";
+        this->printSet(cTransitions);
+        this->m_cGraph->SaveAsDot("dot/steps/"+this->GetNextStepLabel());
+    }
 }
 
-void CWFGenerator::ApplyInsertConvergentPlaceTransition()
+void CWFGenerator::ApplyCreateSelfloop(int iMaxCreateSelfloop)
 {
-    tNode * inP = this->GetRandomPlace();
+    tNode * cT = this->GetRandomTransition();
 
-    tNodeSet * outTransitions =  inP->GetOutNeighbors();
+    tNodeMap * cPlaces = cT->GetOutNeighbors();
+    if(cPlaces->size() == 1 && (cPlaces->begin()->first)->bIsSink())
+    {
+        return;
+    }
+    int iRand = this->GetRandomNumber(1,iMaxCreateSelfloop);
+    while(cPlaces->size() > iRand)
+    {
+        int iRandPalce = this->GetRandomNumber(0,cPlaces->size()-1);
+        tNodeMapIt NodeIt = cPlaces->begin();
+        std::advance(NodeIt,iRandPalce);
+        cPlaces->erase(NodeIt);
+    }
+    this->CreateSelfloop(cPlaces);
+}
 
-    if(outTransitions->size() < 2)
+void CWFGenerator::CreateSelfloop(tNodeMap * cPlaces)
+{
+    tNode * cNewT = new tNode("Transition",this->GetNextTransitionLabel());
+    this->m_cGraph->AddNode(cNewT);
+
+    for ( tNodeMapIt NodeIt = cPlaces->begin(); NodeIt != cPlaces->end(); ++NodeIt)
+    {
+        CArc<int> *inA = new CArc<int>("Arc", this->GetNextArcLabel(), NodeIt->first, cNewT, NodeIt->second);
+        this->m_cGraph->AddArc(inA);
+        CArc<int> *outA = new CArc<int>("Arc", this->GetNextArcLabel(), cNewT, NodeIt->first, NodeIt->second);
+        this->m_cGraph->AddArc(outA);
+    }
+    if(this->isDebugMode())
+    {
+        std::cout << "New selfloop transition: ";
+        this->printMap(cPlaces);
+        this->m_cGraph->SaveAsDot("dot/steps/"+this->GetNextStepLabel());
+    }
+}
+
+void CWFGenerator::ApplyCreateTransitionPlace()
+{
+    tNode * cTransition = this->GetRandomTransition();
+    this->CreateTransitionPlace(cTransition);
+}
+
+void CWFGenerator::CreateTransitionPlace(tNode * cTransition)
+{
+
+    tNodeMap * cPlaces = cTransition->GetInNeighbors();
+
+    bool bTotal = true;
+
+    tNodeSet * sCandidates =  new tNodeSet();
+    //Agregate canditate transitions
+    for(tNodeMapIt NodeIt = cPlaces->begin(); NodeIt != cPlaces->end(); ++NodeIt)
+    {
+        tNodeMap * outTransitions = NodeIt->first->GetOutNeighbors();
+        for (tNodeMapIt NodeOuIt = outTransitions->begin(); NodeOuIt != outTransitions->end(); ++NodeOuIt)
+        {
+            if(NodeOuIt->second <= NodeIt->second && NodeOuIt->first->GetLabel() != cTransition->GetLabel())
+            {
+                bool bValid = true;
+                tNodeMap * inCandidate = NodeOuIt->first->GetInNeighbors();
+                for ( tNodeMapIt subNodeIt = cPlaces->begin(); subNodeIt != cPlaces->end(); ++subNodeIt)
+                {
+                    if(inCandidate->find(subNodeIt->first) == inCandidate->end())
+                    {
+                        bValid = false;
+                        break;
+                    }
+                }
+                if(bValid)
+                {
+                    if (inCandidate->size() != cPlaces->size())
+                    {
+                        bTotal = false;
+                        //continue;
+                    }
+                    sCandidates->insert(NodeOuIt->first);
+                }
+            }
+        }
+    }
+
+
+    tNode * cNewT = new tNode("Transition",this->GetNextTransitionLabel());
+    this->m_cGraph->AddNode(cNewT);
+    tNode * cNewPlace = new tNode("Place",this->GetNextPlaceLabel());
+    this->m_cGraph->AddNode(cNewPlace);
+    CArc<int> *TtoP = new CArc<int>("Arc", this->GetNextArcLabel(),cNewT, cNewPlace, 1);
+    this->m_cGraph->AddArc(TtoP);
+
+    for(tNodeMapIt NodeIt = cPlaces->begin(); NodeIt != cPlaces->end(); ++NodeIt)
+    {
+        CArc<int> *cPlacetoT = new CArc<int>("Arc", this->GetNextArcLabel(), NodeIt->first, cNewT, 1);
+        this->m_cGraph->AddArc(cPlacetoT);
+    }
+
+    for(tNodeMapIt subNodeIt = cPlaces->begin(); subNodeIt != cPlaces->end(); ++subNodeIt)
+    {
+        this->m_cGraph->DeleteArc(subNodeIt->first,cTransition);
+    }
+    CArc<int> *PtoCandidate = new CArc<int>("Arc", this->GetNextArcLabel(), cNewPlace, cTransition, 1);
+    this->m_cGraph->AddArc(PtoCandidate);
+    for(tNodeSetIt NodeIt = sCandidates->begin(); NodeIt != sCandidates->end(); ++NodeIt)
+    {
+        for(tNodeMapIt subNodeIt = cPlaces->begin(); subNodeIt != cPlaces->end(); ++subNodeIt)
+        {
+            this->m_cGraph->DeleteArc(subNodeIt->first,(*NodeIt));
+        }
+        CArc<int> *PtoCandidate = new CArc<int>("Arc", this->GetNextArcLabel(), cNewPlace, (*NodeIt), 1);
+        this->m_cGraph->AddArc(PtoCandidate);
+    }
+
+    if(this->isDebugMode())
+    {
+        std::cout << "CreateTransitionPlace: " << cTransition->GetLabel() << std::endl;
+        this->m_cGraph->SaveAsDot("dot/steps/"+this->GetNextStepLabel());
+    }
+
+    if(bTotal)
+    {
+        tNodeMap * cCommonOutPlaces = cTransition->GetOutNeighbors();
+        for(tNodeSetIt NodeIt = sCandidates->begin(); NodeIt != sCandidates->end(); ++NodeIt)
+        {
+            tNodeMap * outCandidate = (*NodeIt)->GetOutNeighbors();
+            tNodeMapIt subNodeIt = cCommonOutPlaces->begin();
+            while(subNodeIt != cCommonOutPlaces->end())
+            {
+                if(outCandidate->find(subNodeIt->first) == outCandidate->end())
+                {
+                    subNodeIt = cCommonOutPlaces->erase(subNodeIt);
+                }
+                else
+                {
+                    ++subNodeIt;
+                }
+            }
+            while(cCommonOutPlaces->size() >=  outCandidate->size())
+            {
+                int iRand = this->GetRandomNumber(0, cCommonOutPlaces->size()-1);
+                tNodeMapIt subNodeIt = cCommonOutPlaces->begin();
+                std::advance(subNodeIt,iRand);
+                cCommonOutPlaces->erase(subNodeIt);
+            }
+        }
+        while(cCommonOutPlaces->size() >=  cTransition->GetOutNeighbors()->size())
+        {
+            int iRand = this->GetRandomNumber(0, cCommonOutPlaces->size()-1);
+            tNodeMapIt subNodeIt = cCommonOutPlaces->begin();
+            std::advance(subNodeIt,iRand);
+            cCommonOutPlaces->erase(subNodeIt);
+        }
+
+        for(tNodeMapIt subNodeIt = cCommonOutPlaces->begin(); subNodeIt != cCommonOutPlaces->end(); ++subNodeIt)
+        {
+            std::cout << "applied" << std::endl;
+            this->m_cGraph->DeleteArc(cTransition, subNodeIt->first);
+            CArc<int> *cCommonOutPlacetoT = new CArc<int>("Arc", this->GetNextArcLabel(), cNewT, subNodeIt->first, 1);
+            this->m_cGraph->AddArc(cCommonOutPlacetoT);
+        }
+        for(tNodeSetIt NodeIt = sCandidates->begin(); NodeIt != sCandidates->end(); ++NodeIt)
+        {
+            for(tNodeMapIt subNodeIt = cCommonOutPlaces->begin(); subNodeIt != cCommonOutPlaces->end(); ++subNodeIt)
+            {
+                this->m_cGraph->DeleteArc((*NodeIt), subNodeIt->first);
+            }
+        }
+    }
+}
+
+
+
+void CWFGenerator::ApplyCreateSCC()
+{
+    tNode * cPalce = this->GetRandomPlace();
+    this->CreateSCC(cPalce);
+}
+
+void CWFGenerator::CreateSCC(tNode * cPlace)
+{
+    tNodeMap * InPlace = cPlace->GetInNeighbors();
+    tNodeMap * OutPlace = cPlace->GetOutNeighbors();
+
+    int iSize =  this->GetRandomNumber(1, this->m_iMaxSCCSize);
+    if(iSize == 1)
     {
         return;
     }
 
-    std::map<tNode *, int, CGraph_compare<int>> * rTarget = new std::map<tNode *, int, CGraph_compare<int>>();
+    this->m_cGraph->DeleteNode(cPlace);
 
-    for (tNodeSetIt NodeOuIt = outTransitions->begin(); NodeOuIt != outTransitions->end(); ++NodeOuIt)
+    tNodeSet * cPlaces = new tNodeSet();
+    for(int i = 0; i < iSize; i++)
     {
-        tNodeSet * outPlaces =  (*NodeOuIt)->GetOutNeighbors();
-        if(outPlaces->size() < 2)
-        {
-            return;
-        }
-        for (tNodeSetIt PlaceOuIt = outPlaces->begin(); PlaceOuIt != outPlaces->end(); ++PlaceOuIt)
-        {
-            std::map<tNode *, int, CGraph_compare<int>>::iterator mapIt = rTarget->find(*PlaceOuIt);
-            if(mapIt == rTarget->end())
-            {
-                rTarget->insert( std::pair<tNode *, int>((*PlaceOuIt),1) );
-            }
-            else
-            {
-                mapIt->second+=1;
-            }
-        }
+        tNode * newPlace = new tNode("Place",this->GetNextPlaceLabel());
+        cPlaces->insert(newPlace);
+        this->m_cGraph->AddNode(newPlace);
     }
-    tNode * bestTarget;
-    int maxOccur = 0;
-    for (std::map<tNode *, int, CGraph_compare<int>>::iterator mapIt = rTarget->begin(); mapIt != rTarget->end(); ++mapIt)
+
+    tNode * previousPlace = (*cPlaces->rbegin());
+    for(tNodeSetIt NodeIt = cPlaces->begin(); NodeIt != cPlaces->end(); ++NodeIt)
     {
-        if(mapIt->second > maxOccur)
-        {
-            maxOccur = mapIt->second;
-            bestTarget = mapIt->first;
-        }
+        tNode * currentPlace = (*NodeIt);
+
+        tNode * newT = new tNode("Transition",this->GetNextTransitionLabel());
+        this->m_cGraph->AddNode(newT);
+
+        CArc<int> *inArc = new CArc<int>("Arc", this->GetNextArcLabel(),previousPlace, newT, 1);
+        this->m_cGraph->AddArc(inArc);
+
+        CArc<int> *outArc = new CArc<int>("Arc", this->GetNextArcLabel(),newT, currentPlace, 1);
+        this->m_cGraph->AddArc(outArc);
+
+        previousPlace = currentPlace;
     }
-    if(outTransitions->size() == maxOccur && inP->GetLabel() != bestTarget->GetLabel())
+
+    for(tNodeMapIt NodeIt = InPlace->begin(); NodeIt != InPlace->end(); ++NodeIt)
     {
-        std::cout << "*** InsertConvergentPlaceTransition : " << inP->GetLabel() << std::endl;
-        this->InsertConvergentPlaceTransition(inP,bestTarget,outTransitions);
+        int iRand = this->GetRandomNumber(0, cPlaces->size()-1);
+        tNodeSetIt subNodeIt = cPlaces->begin();
+        std::advance(subNodeIt,iRand);
+
+        CArc<int> *inArc = new CArc<int>("Arc", this->GetNextArcLabel(),NodeIt->first, (*subNodeIt), NodeIt->second);
+        this->m_cGraph->AddArc(inArc);
+    }
+
+    for(tNodeMapIt NodeIt = OutPlace->begin(); NodeIt != OutPlace->end(); ++NodeIt)
+    {
+        int iRand = this->GetRandomNumber(0, cPlaces->size()-1);
+        tNodeSetIt subNodeIt = cPlaces->begin();
+        std::advance(subNodeIt,iRand);
+
+        CArc<int> *outArc = new CArc<int>("Arc", this->GetNextArcLabel(), (*subNodeIt), NodeIt->first, NodeIt->second);
+        this->m_cGraph->AddArc(outArc);
     }
 }
 
 
-void CWFGenerator::InsertConvergentPlaceTransition(tNode * cPin, tNode * cPout, tNodeSet * cTransitions)
+
+std::set<tNodeSet *> * CWFGenerator::GetSubSets(tNodeSet * sSet)
 {
-    tNode * newP = new tNode("Place","p_"+std::to_string(this->GetNextPlaceLabel()));
-    this->m_cGraph->AddNode(newP);
-
-    tNode * newT = new tNode("Transition","t_"+std::to_string(this->GetNextTransitionLabel()));
-    this->m_cGraph->AddNode(newT);
-
-    CArc<int> * newAtonewP = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()), newT, newP,1);
-    this->m_cGraph->AddArc(newAtonewP);
-
-    CArc<int> * newAtooutP = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()), newT, cPout,1);
-    this->m_cGraph->AddArc(newAtooutP);
-
-    CArc<int> * newAcPintonewT = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()), cPin, newT,1);
-    this->m_cGraph->AddArc(newAcPintonewT);
-
-    for ( tNodeSetIt NodeIt = cTransitions->begin(); NodeIt != cTransitions->end(); ++NodeIt)
+    if(sSet->size() == 1)
     {
-        tNodeSet * inPlaces =  (*NodeIt)->GetInNeighbors();
-        tNodeSet * outPlaces =  (*NodeIt)->GetOutNeighbors();
+        std::set<tNodeSet *> * ret = new std::set<tNodeSet *>();
+        tNodeSet * rSet = new tNodeSet();
+        rSet->insert(*(sSet->begin()));
+        ret->insert(rSet);
+        ret->insert(new tNodeSet());
+        return ret;
+    }
+    else
+    {
+        std::set<tNodeSet *> * ret = new std::set<tNodeSet *>();
+        tNode * firstElement = *(sSet->begin());
 
-        this->m_cGraph->DeleteNode(*NodeIt);
+        tNodeSet * WithoutFirstElement = new tNodeSet();
 
-        tNode * cT = new tNode("Transition","t_"+std::to_string(this->GetNextTransitionLabel()));
-        this->m_cGraph->AddNode(cT);
-
-        CArc<int> * inAfromnewP = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),newP,cT,1);
-        this->m_cGraph->AddArc(inAfromnewP);
-
-        for ( tNodeSetIt NodeInIt = inPlaces->begin(); NodeInIt != inPlaces->end(); ++NodeInIt)
+        tNodeSetIt start = sSet->begin();
+        std::advance(start,1);
+        for ( tNodeSetIt NodeIt = start; NodeIt != sSet->end(); ++NodeIt)
         {
-            if((*NodeInIt) != cPin)
-            {
-                CArc<int> * inA = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()),(*NodeInIt),cT,1);
-                this->m_cGraph->AddArc(inA);
-            }
+            WithoutFirstElement->insert(*NodeIt);
         }
-        for (tNodeSetIt NodeOuIt = outPlaces->begin(); NodeOuIt != outPlaces->end(); ++NodeOuIt)
+        std::set<tNodeSet *> * sSet1 = this->GetSubSets(WithoutFirstElement);
+        std::set<tNodeSet *> * sSet2 = this->GetSubSets(WithoutFirstElement);
+        for (std::set<tNodeSet *>::iterator setIt = sSet1->begin(); setIt != sSet1->end(); ++setIt)
         {
-            if((*NodeOuIt) != cPout)
-            {
-                CArc<int> * inA = new CArc<int>("Arc","a_"+std::to_string(this->GetNextArcLabel()), cT, (*NodeOuIt),1);
-                this->m_cGraph->AddArc(inA);
-            }
+            (*setIt)->insert(firstElement);
         }
+        for (std::set<tNodeSet *>::iterator setIt = sSet1->begin(); setIt != sSet1->end(); ++setIt)
+        {
+            ret->insert((*setIt));
+        }
+        for (std::set<tNodeSet *>::iterator setIt = sSet2->begin(); setIt != sSet2->end(); ++setIt)
+        {
+            ret->insert((*setIt));
+        }
+        return ret;
     }
 }
 
@@ -579,7 +646,7 @@ tNode * CWFGenerator::GetRandomPlace()
         NodeIt = this->m_cGraph->GetPlaces()->begin();
         std::advance(NodeIt,iRand);
     }
-    while ((*NodeIt)->GetLabel() == "i" || (*NodeIt)->GetLabel() == "o");
+    while ((*NodeIt)->bIsSource() || (*NodeIt)->bIsSink());
     return (*NodeIt);
 }
 
@@ -621,7 +688,15 @@ void CWFGenerator::SaveGeneratedWFAsXML(std::string sFile)
     eInfos->InsertEndChild(eTime);
 
     tinyxml2::XMLElement * eArgs = doc->NewElement("Args");
-    std::string args = std::to_string(this->m_iIteration) + " | " + std::to_string(this->m_iMaxCreatePlace) + " | " + std::to_string(this->m_iMaxCreateSelfloop) + " | " + std::to_string(this->m_iMaxCreateTransition) + " | " + std::to_string(this->m_pCreatePlace) + " | " + std::to_string(this->m_pCreateSelfloop) + " | " + std::to_string(this->m_pCreateTransition) + " | " + std::to_string(this->m_pInsertTransition) + " | " + std::to_string(this->m_pInsertPalce) + " | " + std::to_string(this->m_pInsertConvergentPlaceTransition);
+    std::string args = std::to_string(this->m_iIteration) + " | "
+                       + std::to_string(this->m_iMaxCreatePlace) + " | "
+                       + std::to_string(this->m_iMaxCreateSelfloop) + " | "
+                       + std::to_string(this->m_iMaxCreateTransition)  + " | "
+                       + std::to_string(this->m_pCreatePlace) + " | "
+                       + std::to_string(this->m_pCreateSelfloop) + " | "
+                       + std::to_string(this->m_pCreateTransition) + " | "
+                       + std::to_string(this->m_pTransitionPlace) + " | "
+                       + std::to_string(this->m_pPlaceTransition);
     tinyxml2::XMLText * tArgs = doc->NewText(args.c_str());
     eArgs->InsertEndChild(tArgs);
     eInfos->InsertEndChild(eArgs);

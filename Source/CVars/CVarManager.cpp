@@ -12,13 +12,13 @@ void CVarManager::Initialize()
     this->AddCVar<int>("iMaxCreatePlace", 3);
     this->AddCVar<int>("iMaxCreateSelfloop", 3);
     this->AddCVar<int>("iMaxCreateTransition", 3);
+    this->AddCVar<int>("iMaxSCCSize", 3);
     this->AddCVar<int>("pCreatePlace", 20);
     this->AddCVar<int>("pCreateSelfloop", 20);
     this->AddCVar<int>("pCreateTransition", 20);
-    this->AddCVar<int>("pInsertTransition", 20);
-    this->AddCVar<int>("pInsertPalce", 20);
-    this->AddCVar<int>("pInsertConvergentPlaceTransition", 20);
-
+    this->AddCVar<int>("pTransitionPlace", 20);
+    this->AddCVar<int>("pPlaceTransition", 20);
+    this->AddCVar<int>("pCreateSCC", 20);
     this->SetInitialized();
 }
 
